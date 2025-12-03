@@ -1061,7 +1061,7 @@ function CreateCampaignModal({ onClose, onSuccess }) {
               required
             />
             <p className="text-xs text-gray-500 mt-1">
-              Use {{`firstName`}}, {{`lastName`}}, {{`company`}} for personalization
+              Use {`{{firstName}}`}, {`{{lastName}}`}, {`{{company}}`} for personalization
             </p>
           </div>
 
