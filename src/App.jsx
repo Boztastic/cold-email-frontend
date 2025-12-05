@@ -352,6 +352,183 @@ function OverviewItem({ icon: Icon, label, value, color = '#667eea' }) {
 // Replace the existing WarmingPage and AddWarmingAccountModal in App.jsx
 // =============================================================================
 
+// =============================================================================
+// WARMING CONTROL PANEL
+// =============================================================================
+
+function WarmingControlPanel({ getToken, showNotification, accounts }) {
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+  const [config, setConfig] = useState({
+    emailsPerDay: 10,
+    aiFrequency: 0.3,
+    replyProbability: 0.8
+  });
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const data = await apiCall('/api/warming/status', {}, getToken());
+      setStatus(data);
+      if (data.emailsPerDay) {
+        setConfig({
+          emailsPerDay: data.emailsPerDay,
+          aiFrequency: data.aiFrequency || 0.3,
+          replyProbability: data.replyProbability || 0.8
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch warming status:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => { 
+    fetchStatus(); 
+    const interval = setInterval(fetchStatus, 30000);
+    return () => clearInterval(interval);
+  }, [fetchStatus]);
+
+  const handleStart = async () => {
+    if (accounts.length < 2) {
+      showNotification('Add at least 2 email accounts to start warming', 'warning');
+      return;
+    }
+    setStarting(true);
+    try {
+      await apiCall('/api/warming/start', { method: 'POST', body: JSON.stringify(config) }, getToken());
+      showNotification('🔥 Warming started!', 'success');
+      fetchStatus();
+    } catch (error) {
+      showNotification(error.message, 'error');
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  const handleStop = async () => {
+    setStopping(true);
+    try {
+      await apiCall('/api/warming/stop', { method: 'POST' }, getToken());
+      showNotification('Warming stopped', 'info');
+      fetchStatus();
+    } catch (error) {
+      showNotification(error.message, 'error');
+    } finally {
+      setStopping(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <RefreshCw size={20} style={{ animation: 'spin 1s linear infinite' }} />
+          <span>Loading warming status...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const isActive = status?.status === 'active';
+
+  return (
+    <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>🔥 Auto Warming</h2>
+            <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: isActive ? '#d1fae5' : '#f3f4f6', color: isActive ? '#065f46' : '#6b7280' }}>
+              {isActive ? '● Active' : '○ Inactive'}
+            </span>
+          </div>
+          <p style={{ color: '#6b7280', fontSize: 14, margin: 0 }}>Automatically send emails between your accounts to build reputation</p>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button onClick={() => setShowConfig(!showConfig)} style={secondaryButtonStyle}><Settings size={16} /> Configure</button>
+          {isActive ? (
+            <button onClick={handleStop} disabled={stopping} style={{ ...secondaryButtonStyle, background: '#fee2e2', color: '#991b1b' }}>
+              {stopping ? <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Pause size={16} />}
+              {stopping ? 'Stopping...' : 'Stop Warming'}
+            </button>
+          ) : (
+            <button onClick={handleStart} disabled={starting || accounts.length < 2} style={primaryButtonStyle}>
+              {starting ? <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={16} />}
+              {starting ? 'Starting...' : 'Start Warming'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {accounts.length < 2 && (
+        <div style={{ background: '#fef3c7', borderRadius: 8, padding: 16, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <AlertTriangle size={20} color="#d97706" />
+          <span style={{ color: '#92400e', fontSize: 14 }}>Add at least 2 email accounts to enable auto warming. Your accounts will send emails to each other.</span>
+        </div>
+      )}
+
+      {showConfig && (
+        <div style={{ background: '#f9fafb', borderRadius: 8, padding: 20, marginBottom: 20, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#374151' }}>Emails per Day</label>
+            <input type="range" min="1" max="50" value={config.emailsPerDay} onChange={e => setConfig({ ...config, emailsPerDay: parseInt(e.target.value) })} style={{ width: '100%' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b7280' }}><span>1</span><span style={{ fontWeight: 600, color: '#111827' }}>{config.emailsPerDay}</span><span>50</span></div>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#374151' }}>AI Response Rate</label>
+            <input type="range" min="0" max="100" value={config.aiFrequency * 100} onChange={e => setConfig({ ...config, aiFrequency: parseInt(e.target.value) / 100 })} style={{ width: '100%' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b7280' }}><span>Templates</span><span style={{ fontWeight: 600, color: '#111827' }}>{Math.round(config.aiFrequency * 100)}% AI</span><span>Full AI</span></div>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#374151' }}>Reply Probability</label>
+            <input type="range" min="0" max="100" value={config.replyProbability * 100} onChange={e => setConfig({ ...config, replyProbability: parseInt(e.target.value) / 100 })} style={{ width: '100%' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b7280' }}><span>0%</span><span style={{ fontWeight: 600, color: '#111827' }}>{Math.round(config.replyProbability * 100)}%</span><span>100%</span></div>
+          </div>
+        </div>
+      )}
+
+      {status && status.status !== 'not_configured' && status.status !== 'not_initialized' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>📤</div><div style={{ fontSize: 24, fontWeight: 700, color: '#667eea' }}>{status.emailsSentTotal || 0}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Total Sent</div></div>
+          <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>🤖</div><div style={{ fontSize: 24, fontWeight: 700, color: '#10b981' }}>{status.aiEmailsSent || 0}</div><div style={{ fontSize: 12, color: '#6b7280' }}>AI Generated</div></div>
+          <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>↩️</div><div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b' }}>{status.repliesSent || 0}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Auto Replies</div></div>
+          <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>📅</div><div style={{ fontSize: 24, fontWeight: 700, color: '#8b5cf6' }}>{status.emailsPerDay || config.emailsPerDay}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Per Day</div></div>
+        </div>
+      )}
+
+      {status?.recentEmails && status.recentEmails.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#374151' }}>Recent Activity</h3>
+          <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+            {status.recentEmails.slice(0, 5).map((email, i) => (
+              <div key={email.id || i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < 4 ? '1px solid #f3f4f6' : 'none' }}>
+                <span style={{ fontSize: 18 }}>{email.is_reply ? '↩️' : '📤'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{email.sender_email} → {email.recipient_email}</div>
+                  <div style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{email.subject}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {email.is_ai_generated && <span style={{ padding: '2px 8px', background: '#dbeafe', color: '#1e40af', borderRadius: 4, fontSize: 10, fontWeight: 600 }}>AI</span>}
+                  <span style={{ fontSize: 11, color: '#9ca3af' }}>{new Date(email.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+// =============================================================================
+// WARMING PAGE
+// =============================================================================
+
 function WarmingPage({ getToken, showNotification }) {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -411,6 +588,9 @@ function WarmingPage({ getToken, showNotification }) {
           </button>
         </div>
       </div>
+
+      {/* Auto Warming Control Panel */}
+      <WarmingControlPanel getToken={getToken} showNotification={showNotification} accounts={accounts} />
 
       {/* Quick Setup Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 32 }}>
