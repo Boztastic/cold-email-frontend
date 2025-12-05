@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, X, Home, Flame, Users, Mail, Settings, Plus, Upload, Play, Pause, Trash2, Edit, Download, Search, Filter, BarChart3, AlertCircle, CheckCircle, Clock, Send, Eye, MousePointer, Reply, Shield, LogOut } from 'lucide-react';
+import { Menu, Home, Flame, Users as UsersIcon, Mail, Settings, Shield, AlertCircle } from 'lucide-react';
 import { AuthProvider, useAuth, LoginPage, UserManagement, LogoutButton } from './AuthComponents';
 
-// API Configuration
+// =============================================================================
+// API CONFIGURATION
+// =============================================================================
+
 const API_BASE_URL = 'https://cold-email-system-1.onrender.com';
 
-// Main App Component with Authentication
-export default function ColdEmailMVP() {
+// =============================================================================
+// MAIN APP COMPONENT
+// =============================================================================
+
+export default function App() {
   return (
     <AuthProvider>
       <AppContent />
@@ -14,18 +20,27 @@ export default function ColdEmailMVP() {
   );
 }
 
-// App Content (authenticated)
+// =============================================================================
+// APP CONTENT (Authenticated)
+// =============================================================================
+
 function AppContent() {
-  const { user, loading, token, isAdmin } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [stats, setStats] = useState(null);
 
   // Show loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-purple-600 to-blue-600">
-        <div className="text-white text-xl">Loading...</div>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        fontFamily: 'system-ui, -apple-system, sans-serif'
+      }}>
+        <div style={{ color: 'white', fontSize: '20px' }}>Loading...</div>
       </div>
     );
   }
@@ -35,147 +50,161 @@ function AppContent() {
     return <LoginPage />;
   }
 
-  // Fetch system stats (public endpoint - no auth needed)
-  const fetchStats = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/health`);
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data);
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchStats();
-    const interval = setInterval(fetchStats, 5000); // Refresh every 5s
-    return () => clearInterval(interval);
-  }, []);
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard stats={stats} token={token} />;
-      case 'warming':
-        return <Warming token={token} />;
-      case 'contacts':
-        return <Contacts token={token} />;
-      case 'campaigns':
-        return <Campaigns token={token} />;
-      case 'settings':
-        return <SettingsPage token={token} />;
-      case 'users':
-        return <UserManagement />;
-      default:
-        return <Dashboard stats={stats} token={token} />;
-    }
-  };
-
+  // Main app layout
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      background: '#f9fafb',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
       {/* Sidebar */}
-      <Sidebar 
-        currentPage={currentPage} 
+      <Sidebar
+        currentPage={currentPage}
         setCurrentPage={setCurrentPage}
         sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
         isAdmin={isAdmin}
         user={user}
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Top Bar */}
-        <TopBar 
-          setSidebarOpen={setSidebarOpen}
-          stats={stats}
-          user={user}
-        />
+        <TopBar setSidebarOpen={setSidebarOpen} />
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {renderPage()}
+        <main style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+          {renderPage(currentPage)}
         </main>
       </div>
     </div>
   );
 }
 
-// Helper function to safely fetch with auth
-async function safeFetch(url, token, options = {}) {
-  try {
-    const headers = {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`
-    };
-    
-    const response = await fetch(url, { ...options, headers });
-    
-    // Check if response is JSON
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return await response.json();
-    } else {
-      // Backend not ready for this endpoint
-      console.warn('Backend endpoint not ready:', url);
-      return { error: 'Backend authentication not configured yet', accounts: [], contacts: [], campaigns: [] };
-    }
-  } catch (error) {
-    console.error('API call failed:', url, error);
-    return { error: error.message, accounts: [], contacts: [], campaigns: [] };
+// =============================================================================
+// PAGE ROUTER
+// =============================================================================
+
+function renderPage(page) {
+  switch (page) {
+    case 'dashboard':
+      return <Dashboard />;
+    case 'warming':
+      return <WarmingPage />;
+    case 'contacts':
+      return <ContactsPage />;
+    case 'campaigns':
+      return <CampaignsPage />;
+    case 'settings':
+      return <SettingsPage />;
+    case 'users':
+      return <UserManagement />;
+    default:
+      return <Dashboard />;
   }
 }
 
-// Sidebar Component
-function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, isAdmin, user }) {
+// =============================================================================
+// SIDEBAR COMPONENT
+// =============================================================================
+
+function Sidebar({ currentPage, setCurrentPage, sidebarOpen, isAdmin, user }) {
   const navItems = [
     { id: 'dashboard', icon: Home, label: 'Dashboard' },
     { id: 'warming', icon: Flame, label: 'Warming' },
-    { id: 'contacts', icon: Users, label: 'Contacts' },
+    { id: 'contacts', icon: UsersIcon, label: 'Contacts' },
     { id: 'campaigns', icon: Mail, label: 'Campaigns' },
     { id: 'settings', icon: Settings, label: 'Settings' },
     { id: 'users', icon: Shield, label: 'Users', adminOnly: true },
   ];
 
   // Filter nav items based on role
-  const visibleNavItems = navItems.filter(item => !item.adminOnly || isAdmin());
+  const visibleItems = navItems.filter(item => !item.adminOnly || isAdmin());
 
   if (!sidebarOpen) return null;
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+    <div style={{
+      width: '260px',
+      background: 'white',
+      borderRight: '1px solid #e5e7eb',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
       {/* Logo */}
-      <div className="h-16 flex items-center justify-between px-6 border-b border-gray-200">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
-            <Mail className="w-5 h-5 text-white" />
-          </div>
-          <span className="font-bold text-xl">Cold Email</span>
+      <div style={{
+        height: '64px',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 24px',
+        borderBottom: '1px solid #e5e7eb'
+      }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          background: 'linear-gradient(135deg, #667eea, #764ba2)',
+          borderRadius: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: '12px'
+        }}>
+          <Mail size={20} color="white" />
         </div>
+        <span style={{ fontWeight: 'bold', fontSize: '18px' }}>Cold Email</span>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
-        {visibleNavItems.map((item) => {
+      <nav style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
+        {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
-          
+
           return (
             <button
               key={item.id}
               onClick={() => setCurrentPage(item.id)}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                isActive 
-                  ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' 
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                marginBottom: '4px',
+                background: isActive ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'transparent',
+                color: isActive ? 'white' : '#6b7280',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'left'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.target.style.background = '#f3f4f6';
+                  e.target.style.color = '#111827';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.target.style.background = 'transparent';
+                  e.target.style.color = '#6b7280';
+                }
+              }}
             >
-              <Icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
+              <Icon size={20} />
+              <span>{item.label}</span>
               {item.adminOnly && (
-                <span className="ml-auto text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                <span style={{
+                  marginLeft: 'auto',
+                  fontSize: '11px',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  background: isActive ? 'rgba(255,255,255,0.2)' : '#ede9fe',
+                  color: isActive ? 'white' : '#7c3aed'
+                }}>
                   Admin
                 </span>
               )}
@@ -185,43 +214,124 @@ function Sidebar({ currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, isA
       </nav>
 
       {/* User Info Footer */}
-      <div className="p-4 border-t border-gray-200">
-        <div className="bg-purple-50 rounded-lg p-4">
-          <p className="text-sm font-medium text-purple-900 mb-1">
+      <div style={{
+        padding: '16px',
+        borderTop: '1px solid #e5e7eb'
+      }}>
+        <div style={{
+          background: '#f9fafb',
+          borderRadius: '10px',
+          padding: '12px'
+        }}>
+          <p style={{
+            fontSize: '14px',
+            fontWeight: '600',
+            marginBottom: '4px',
+            color: '#111827'
+          }}>
             {user.name}
           </p>
-          <p className="text-xs text-purple-600 mb-2">{user.email}</p>
-          <div className="flex items-center">
-            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-              user.role === 'admin' 
-                ? 'bg-purple-200 text-purple-800' 
-                : 'bg-gray-200 text-gray-700'
-            }`}>
-              {user.role}
-            </span>
-          </div>
+          <p style={{
+            fontSize: '12px',
+            color: '#6b7280',
+            marginBottom: '8px'
+          }}>
+            {user.email}
+          </p>
+          <span style={{
+            display: 'inline-block',
+            padding: '4px 10px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            fontWeight: '600',
+            background: user.role === 'admin' ? '#ede9fe' : '#f3f4f6',
+            color: user.role === 'admin' ? '#7c3aed' : '#6b7280'
+          }}>
+            {user.role}
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-// Top Bar Component
-function TopBar({ setSidebarOpen, stats, user }) {
+// =============================================================================
+// TOP BAR COMPONENT
+// =============================================================================
+
+function TopBar({ setSidebarOpen }) {
+  const [systemStatus, setSystemStatus] = useState(null);
+
+  // Fetch system health
+  useEffect(() => {
+    const fetchHealth = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/health`);
+        if (response.ok) {
+          const data = await response.json();
+          setSystemStatus(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch health:', error);
+      }
+    };
+
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 30000); // Every 30s
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+    <div style={{
+      height: '64px',
+      background: 'white',
+      borderBottom: '1px solid #e5e7eb',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '0 24px'
+    }}>
       <button
         onClick={() => setSidebarOpen(prev => !prev)}
-        className="p-2 hover:bg-gray-100 rounded-lg"
+        style={{
+          padding: '8px',
+          background: 'none',
+          border: 'none',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          color: '#6b7280'
+        }}
+        onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+        onMouseLeave={(e) => e.target.style.background = 'none'}
       >
-        <Menu className="w-5 h-5" />
+        <Menu size={20} />
       </button>
 
-      <div className="flex items-center space-x-4">
-        {stats && (
-          <div className="flex items-center space-x-2 px-3 py-1 bg-green-50 rounded-full">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-sm text-green-700 font-medium">System Online</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        {systemStatus && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 12px',
+            background: '#d1fae5',
+            borderRadius: '6px'
+          }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              background: '#10b981'
+            }} />
+            <span style={{
+              fontSize: '13px',
+              fontWeight: '500',
+              color: '#065f46'
+            }}>
+              System Online
+            </span>
           </div>
         )}
         <LogoutButton />
@@ -230,401 +340,455 @@ function TopBar({ setSidebarOpen, stats, user }) {
   );
 }
 
-// Dashboard Component
-function Dashboard({ stats, token }) {
+// =============================================================================
+// DASHBOARD PAGE
+// =============================================================================
+
+function Dashboard() {
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/health`);
+        if (response.ok) {
+          const data = await response.json();
+          setStats(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Overview of your cold email campaigns</p>
+    <div>
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
+          Dashboard
+        </h1>
+        <p style={{ color: '#6b7280' }}>
+          Welcome to your cold email campaign manager
+        </p>
       </div>
 
-      {/* Backend Auth Warning */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-start">
-          <AlertCircle className="w-5 h-5 text-yellow-600 mr-3 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-yellow-900">Backend Authentication Not Configured</p>
-            <p className="text-xs text-yellow-700 mt-1">
-              Some features require backend authentication to be set up. Follow the AUTH_INTEGRATION_GUIDE.txt to enable full functionality.
-            </p>
-          </div>
+      {/* Warning Banner */}
+      <div style={{
+        background: '#fef3c7',
+        border: '1px solid #fcd34d',
+        borderRadius: '10px',
+        padding: '16px',
+        marginBottom: '32px',
+        display: 'flex',
+        gap: '12px'
+      }}>
+        <AlertCircle size={20} color="#92400e" style={{ flexShrink: 0 }} />
+        <div>
+          <p style={{ fontSize: '14px', fontWeight: '600', color: '#92400e', marginBottom: '4px' }}>
+            Backend Authentication Required
+          </p>
+          <p style={{ fontSize: '13px', color: '#78350f' }}>
+            To enable full functionality, add authentication to your backend server. 
+            See AUTH_INTEGRATION_GUIDE.txt for instructions.
+          </p>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: '24px',
+        marginBottom: '32px'
+      }}>
         <StatCard
           icon={Mail}
           label="Active Campaigns"
           value={stats?.campaigns || 0}
-          color="purple"
+          color="#667eea"
         />
         <StatCard
           icon={Flame}
           label="Warming Campaigns"
           value={stats?.warmingCampaigns || 0}
-          color="orange"
+          color="#f59e0b"
         />
         <StatCard
-          icon={CheckCircle}
-          label="Warm Accounts"
-          value={stats?.warmingAccounts || 0}
-          color="green"
+          icon={UsersIcon}
+          label="Total Contacts"
+          value={0}
+          color="#10b981"
         />
         <StatCard
-          icon={Clock}
-          label="Email Queue"
-          value={stats?.queueLength || 0}
-          color="blue"
+          icon={Mail}
+          label="Emails Sent"
+          value={0}
+          color="#3b82f6"
         />
-      </div>
-
-      {/* Activity Feed */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
-        <div className="space-y-4">
-          <div className="text-center py-8 text-gray-500">
-            <AlertCircle className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-            <p>Enable backend authentication to see activity</p>
-          </div>
-        </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <QuickActionCard
-          icon={Flame}
-          title="Start Warming"
-          description="Begin warming up your email accounts"
-          color="orange"
-        />
-        <QuickActionCard
-          icon={Upload}
-          title="Import Contacts"
-          description="Upload your contact list"
-          color="blue"
-        />
-        <QuickActionCard
-          icon={Send}
-          title="New Campaign"
-          description="Create a new email campaign"
-          color="purple"
-        />
-      </div>
-    </div>
-  );
-}
-
-// Stat Card Component
-function StatCard({ icon: Icon, label, value, color }) {
-  const colors = {
-    purple: 'from-purple-600 to-purple-700',
-    orange: 'from-orange-600 to-orange-700',
-    green: 'from-green-600 to-green-700',
-    blue: 'from-blue-600 to-blue-700',
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`w-12 h-12 bg-gradient-to-r ${colors[color]} rounded-lg flex items-center justify-center`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-      </div>
       <div>
-        <p className="text-3xl font-bold text-gray-900">{value}</p>
-        <p className="text-sm text-gray-600 mt-1">{label}</p>
-      </div>
-    </div>
-  );
-}
-
-// Quick Action Card Component
-function QuickActionCard({ icon: Icon, title, description, color }) {
-  const colors = {
-    purple: 'from-purple-600 to-purple-700',
-    orange: 'from-orange-600 to-orange-700',
-    blue: 'from-blue-600 to-blue-700',
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer">
-      <div className={`w-12 h-12 bg-gradient-to-r ${colors[color]} rounded-lg flex items-center justify-center mb-4`}>
-        <Icon className="w-6 h-6 text-white" />
-      </div>
-      <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
-      <p className="text-sm text-gray-600">{description}</p>
-    </div>
-  );
-}
-
-// Warming Component
-function Warming({ token }) {
-  const [accounts, setAccounts] = useState([]);
-  const [showAddModal, setShowAddModal] = useState(false);
-
-  const fetchAccounts = async () => {
-    const data = await safeFetch(`${API_BASE_URL}/api/warming/accounts`, token);
-    setAccounts(data.accounts || []);
-  };
-
-  useEffect(() => {
-    fetchAccounts();
-  }, [token]);
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Email Warming</h1>
-          <p className="text-gray-600 mt-1">Gradually warm up your email accounts</p>
-        </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg hover:from-orange-700 hover:to-orange-800"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Account</span>
-        </button>
-      </div>
-
-      {/* Backend Auth Warning */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-start">
-          <AlertCircle className="w-5 h-5 text-yellow-600 mr-3 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-yellow-900">Backend Authentication Required</p>
-            <p className="text-xs text-yellow-700 mt-1">
-              Add backend authentication to enable warming accounts. See AUTH_INTEGRATION_GUIDE.txt
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Accounts List */}
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold">Warming Accounts ({accounts.length})</h2>
-        </div>
-        <div className="divide-y divide-gray-200">
-          <div className="p-12 text-center">
-            <Flame className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 mb-2">Backend authentication required</p>
-            <p className="text-sm text-gray-500">Follow the integration guide to enable warming</p>
-          </div>
-        </div>
-      </div>
-
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h2 className="text-xl font-bold mb-4">Backend Auth Required</h2>
-            <p className="text-gray-600 mb-4">
-              Please set up backend authentication first before adding warming accounts.
-            </p>
-            <button
-              onClick={() => setShowAddModal(false)}
-              className="w-full px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Contacts Component
-function Contacts({ token }) {
-  const [contacts, setContacts] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const fetchContacts = async () => {
-    const data = await safeFetch(`${API_BASE_URL}/api/contacts`, token);
-    setContacts(data.contacts || []);
-  };
-
-  useEffect(() => {
-    fetchContacts();
-  }, [token]);
-
-  const filteredContacts = contacts.filter(contact =>
-    contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.company?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Contacts</h1>
-          <p className="text-gray-600 mt-1">Manage your contact list</p>
-        </div>
-      </div>
-
-      {/* Backend Auth Warning */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-start">
-          <AlertCircle className="w-5 h-5 text-yellow-600 mr-3 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-yellow-900">Backend Authentication Required</p>
-            <p className="text-xs text-yellow-700 mt-1">
-              Add backend authentication to manage contacts. See AUTH_INTEGRATION_GUIDE.txt
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search contacts..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>
+          Quick Actions
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '16px'
+        }}>
+          <QuickActionCard
+            icon={Flame}
+            title="Start Warming"
+            description="Warm up email accounts"
+          />
+          <QuickActionCard
+            icon={UsersIcon}
+            title="Import Contacts"
+            description="Upload contact list"
+          />
+          <QuickActionCard
+            icon={Mail}
+            title="New Campaign"
+            description="Create email campaign"
           />
         </div>
       </div>
-
-      {/* Contacts Table */}
-      <div className="bg-white rounded-xl border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold">All Contacts (0)</h2>
-        </div>
-        <div className="p-12 text-center">
-          <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 mb-2">Backend authentication required</p>
-          <p className="text-sm text-gray-500">Follow the integration guide to manage contacts</p>
-        </div>
-      </div>
     </div>
   );
 }
 
-// Campaigns Component
-function Campaigns({ token }) {
-  const [campaigns, setCampaigns] = useState([]);
-
-  const fetchCampaigns = async () => {
-    const data = await safeFetch(`${API_BASE_URL}/api/campaigns`, token);
-    setCampaigns(data.campaigns || []);
-  };
-
-  useEffect(() => {
-    fetchCampaigns();
-  }, [token]);
-
+function StatCard({ icon: Icon, label, value, color }) {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Campaigns</h1>
-          <p className="text-gray-600 mt-1">Manage your email campaigns</p>
+    <div style={{
+      background: 'white',
+      borderRadius: '12px',
+      border: '1px solid #e5e7eb',
+      padding: '24px'
+    }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '16px'
+      }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '10px',
+          background: `${color}15`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Icon size={24} color={color} />
         </div>
       </div>
+      <p style={{
+        fontSize: '32px',
+        fontWeight: 'bold',
+        marginBottom: '4px'
+      }}>
+        {value}
+      </p>
+      <p style={{ fontSize: '14px', color: '#6b7280' }}>
+        {label}
+      </p>
+    </div>
+  );
+}
 
-      {/* Backend Auth Warning */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-start">
-          <AlertCircle className="w-5 h-5 text-yellow-600 mr-3 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-yellow-900">Backend Authentication Required</p>
-            <p className="text-xs text-yellow-700 mt-1">
-              Add backend authentication to create campaigns. See AUTH_INTEGRATION_GUIDE.txt
-            </p>
-          </div>
-        </div>
+function QuickActionCard({ icon: Icon, title, description }) {
+  return (
+    <div style={{
+      background: 'white',
+      borderRadius: '12px',
+      border: '1px solid #e5e7eb',
+      padding: '20px',
+      cursor: 'pointer',
+      transition: 'all 0.2s'
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.transform = 'translateY(-4px)';
+      e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.1)';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.transform = 'translateY(0)';
+      e.currentTarget.style.boxShadow = 'none';
+    }}>
+      <Icon size={24} color="#667eea" style={{ marginBottom: '12px' }} />
+      <h3 style={{
+        fontSize: '16px',
+        fontWeight: '600',
+        marginBottom: '4px'
+      }}>
+        {title}
+      </h3>
+      <p style={{ fontSize: '13px', color: '#6b7280' }}>
+        {description}
+      </p>
+    </div>
+  );
+}
+
+// =============================================================================
+// WARMING PAGE
+// =============================================================================
+
+function WarmingPage() {
+  return (
+    <div>
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
+          Email Warming
+        </h1>
+        <p style={{ color: '#6b7280' }}>
+          Gradually warm up your email accounts to improve deliverability
+        </p>
       </div>
 
-      {/* Campaigns Grid */}
-      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-        <Send className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <p className="text-gray-600 mb-2">Backend authentication required</p>
-        <p className="text-sm text-gray-500">Follow the integration guide to create campaigns</p>
+      <InfoBanner message="Add backend authentication to enable warming features" />
+
+      <div style={{
+        background: 'white',
+        borderRadius: '12px',
+        border: '1px solid #e5e7eb',
+        padding: '60px',
+        textAlign: 'center'
+      }}>
+        <Flame size={48} color="#f59e0b" style={{ margin: '0 auto 16px' }} />
+        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+          No Warming Accounts Yet
+        </h3>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>
+          Add backend authentication to start warming email accounts
+        </p>
       </div>
     </div>
   );
 }
 
-// Settings Component
-function SettingsPage({ token }) {
+// =============================================================================
+// CONTACTS PAGE
+// =============================================================================
+
+function ContactsPage() {
+  return (
+    <div>
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
+          Contacts
+        </h1>
+        <p style={{ color: '#6b7280' }}>
+          Manage your contact lists and segments
+        </p>
+      </div>
+
+      <InfoBanner message="Add backend authentication to manage contacts" />
+
+      <div style={{
+        background: 'white',
+        borderRadius: '12px',
+        border: '1px solid #e5e7eb',
+        padding: '60px',
+        textAlign: 'center'
+      }}>
+        <UsersIcon size={48} color="#10b981" style={{ margin: '0 auto 16px' }} />
+        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+          No Contacts Yet
+        </h3>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>
+          Add backend authentication to import and manage contacts
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// CAMPAIGNS PAGE
+// =============================================================================
+
+function CampaignsPage() {
+  return (
+    <div>
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
+          Campaigns
+        </h1>
+        <p style={{ color: '#6b7280' }}>
+          Create and manage your email campaigns
+        </p>
+      </div>
+
+      <InfoBanner message="Add backend authentication to create campaigns" />
+
+      <div style={{
+        background: 'white',
+        borderRadius: '12px',
+        border: '1px solid #e5e7eb',
+        padding: '60px',
+        textAlign: 'center'
+      }}>
+        <Mail size={48} color="#3b82f6" style={{ margin: '0 auto 16px' }} />
+        <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+          No Campaigns Yet
+        </h3>
+        <p style={{ fontSize: '14px', color: '#6b7280' }}>
+          Add backend authentication to create and run email campaigns
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// SETTINGS PAGE
+// =============================================================================
+
+function SettingsPage() {
   const [settings, setSettings] = useState({
-    defaultSenderName: '',
+    senderName: '',
     emailSignature: '',
-    timezone: 'UTC',
-    emailNotifications: true
+    timezone: 'UTC'
   });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-1">Configure your system preferences</p>
+    <div>
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
+          Settings
+        </h1>
+        <p style={{ color: '#6b7280' }}>
+          Configure your system preferences
+        </p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+      <div style={{
+        background: 'white',
+        borderRadius: '12px',
+        border: '1px solid #e5e7eb',
+        padding: '32px'
+      }}>
+        <div style={{ marginBottom: '24px' }}>
+          <label style={{
+            display: 'block',
+            fontSize: '14px',
+            fontWeight: '500',
+            marginBottom: '8px'
+          }}>
             Default Sender Name
           </label>
           <input
             type="text"
-            value={settings.defaultSenderName}
-            onChange={(e) => setSettings({...settings, defaultSenderName: e.target.value})}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            value={settings.senderName}
+            onChange={(e) => setSettings({...settings, senderName: e.target.value})}
             placeholder="Your Name"
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              fontSize: '14px',
+              boxSizing: 'border-box'
+            }}
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div style={{ marginBottom: '24px' }}>
+          <label style={{
+            display: 'block',
+            fontSize: '14px',
+            fontWeight: '500',
+            marginBottom: '8px'
+          }}>
             Email Signature
           </label>
           <textarea
             value={settings.emailSignature}
             onChange={(e) => setSettings({...settings, emailSignature: e.target.value})}
+            placeholder="Best regards,&#10;Your Name"
             rows={4}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            placeholder="Best regards,\nYour Name"
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontFamily: 'inherit',
+              resize: 'vertical',
+              boxSizing: 'border-box'
+            }}
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div style={{ marginBottom: '24px' }}>
+          <label style={{
+            display: 'block',
+            fontSize: '14px',
+            fontWeight: '500',
+            marginBottom: '8px'
+          }}>
             Timezone
           </label>
           <select
             value={settings.timezone}
             onChange={(e) => setSettings({...settings, timezone: e.target.value})}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              fontSize: '14px',
+              boxSizing: 'border-box',
+              cursor: 'pointer'
+            }}
           >
             <option value="UTC">UTC</option>
             <option value="America/New_York">Eastern Time</option>
             <option value="America/Chicago">Central Time</option>
             <option value="America/Los_Angeles">Pacific Time</option>
+            <option value="Europe/London">London</option>
           </select>
         </div>
 
-        <div className="pt-4 border-t border-gray-200">
-          <h3 className="font-medium text-gray-900 mb-2">API Endpoint</h3>
-          <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <code className="text-sm text-gray-700">{API_BASE_URL}</code>
-          </div>
-        </div>
-
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-sm text-yellow-900">
-            Settings are stored locally. Backend authentication required for server-side storage.
-          </p>
+        <div style={{
+          padding: '16px',
+          background: '#fef3c7',
+          border: '1px solid #fcd34d',
+          borderRadius: '8px',
+          fontSize: '13px',
+          color: '#92400e'
+        }}>
+          Settings are stored locally. Backend authentication required for server-side storage.
         </div>
       </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// HELPER COMPONENTS
+// =============================================================================
+
+function InfoBanner({ message }) {
+  return (
+    <div style={{
+      background: '#fef3c7',
+      border: '1px solid #fcd34d',
+      borderRadius: '10px',
+      padding: '12px 16px',
+      marginBottom: '24px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
+    }}>
+      <AlertCircle size={18} color="#92400e" />
+      <p style={{ fontSize: '13px', color: '#92400e' }}>
+        {message}
+      </p>
     </div>
   );
 }
