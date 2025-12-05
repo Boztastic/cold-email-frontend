@@ -347,76 +347,565 @@ function OverviewItem({ icon: Icon, label, value, color = '#667eea' }) {
 // WARMING PAGE
 // =============================================================================
 
+// =============================================================================
+// WARMING PAGE - WITH GMAIL QUICK SETUP
+// Replace the existing WarmingPage and AddWarmingAccountModal in App.jsx
+// =============================================================================
+
 function WarmingPage({ getToken, showNotification }) {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showGmailGuide, setShowGmailGuide] = useState(false);
   const [testingId, setTestingId] = useState(null);
 
   const fetchAccounts = useCallback(async () => {
-    try { const data = await apiCall('/api/warming/accounts', {}, getToken()); setAccounts(data.accounts || []); } catch (error) { showNotification('Failed to fetch accounts', 'error'); } finally { setLoading(false); }
+    try { 
+      const data = await apiCall('/api/warming/accounts', {}, getToken()); 
+      setAccounts(data.accounts || []); 
+    } catch (error) { 
+      showNotification('Failed to fetch accounts', 'error'); 
+    } finally { 
+      setLoading(false); 
+    }
   }, [getToken, showNotification]);
 
   useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
 
-  const handleDelete = async (id) => { if (!window.confirm('Delete this account?')) return; try { await apiCall(`/api/warming/accounts/${id}`, { method: 'DELETE' }, getToken()); showNotification('Account deleted', 'success'); fetchAccounts(); } catch (error) { showNotification('Failed to delete', 'error'); } };
-  const handleTest = async (account) => { setTestingId(account.id); try { await apiCall('/api/smtp/test', { method: 'POST', body: JSON.stringify(account) }, getToken()); showNotification('SMTP connection successful!', 'success'); } catch (error) { showNotification(`SMTP test failed: ${error.message}`, 'error'); } finally { setTestingId(null); } };
+  const handleDelete = async (id) => { 
+    if (!window.confirm('Delete this account?')) return; 
+    try { 
+      await apiCall(`/api/warming/accounts/${id}`, { method: 'DELETE' }, getToken()); 
+      showNotification('Account deleted', 'success'); 
+      fetchAccounts(); 
+    } catch (error) { 
+      showNotification('Failed to delete', 'error'); 
+    } 
+  };
+  
+  const handleTest = async (account) => { 
+    setTestingId(account.id); 
+    try { 
+      await apiCall('/api/smtp/test', { method: 'POST', body: JSON.stringify(account) }, getToken()); 
+      showNotification('SMTP connection successful!', 'success'); 
+    } catch (error) { 
+      showNotification(`SMTP test failed: ${error.message}`, 'error'); 
+    } finally { 
+      setTestingId(null); 
+    } 
+  };
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-        <div><h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>Email Warming</h1><p style={{ color: '#6b7280' }}>Warm up your email accounts to improve deliverability</p></div>
-        <button onClick={() => setShowAddModal(true)} style={primaryButtonStyle}><Plus size={18} /> Add Account</button>
+        <div>
+          <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>Email Warming</h1>
+          <p style={{ color: '#6b7280' }}>Warm up your email accounts to improve deliverability</p>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button onClick={() => setShowGmailGuide(true)} style={secondaryButtonStyle}>
+            <Mail size={18} /> Gmail Setup Guide
+          </button>
+          <button onClick={() => setShowAddModal(true)} style={primaryButtonStyle}>
+            <Plus size={18} /> Add Account
+          </button>
+        </div>
       </div>
-      {loading ? <LoadingState message="Loading accounts..." /> : accounts.length === 0 ? <EmptyState icon={Flame} title="No Warming Accounts" description="Add email accounts to start warming." action={{ label: 'Add Account', onClick: () => setShowAddModal(true) }} /> : (
+
+      {/* Quick Setup Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 32 }}>
+        <QuickSetupCard 
+          provider="Gmail"
+          icon="📧"
+          color="#EA4335"
+          description="Personal or Workspace accounts"
+          onClick={() => { setShowAddModal(true); setTimeout(() => window.dispatchEvent(new CustomEvent('prefill-gmail')), 100); }}
+        />
+        <QuickSetupCard 
+          provider="Outlook"
+          icon="📬"
+          color="#0078D4"
+          description="Outlook.com or Microsoft 365"
+          onClick={() => { setShowAddModal(true); setTimeout(() => window.dispatchEvent(new CustomEvent('prefill-outlook')), 100); }}
+        />
+        <QuickSetupCard 
+          provider="Custom SMTP"
+          icon="⚙️"
+          color="#6B7280"
+          description="Any email provider"
+          onClick={() => setShowAddModal(true)}
+        />
+      </div>
+
+      {loading ? (
+        <LoadingState message="Loading accounts..." />
+      ) : accounts.length === 0 ? (
+        <EmptyState 
+          icon={Flame} 
+          title="No Warming Accounts" 
+          description="Add email accounts to start warming. Click Gmail or Outlook above for quick setup." 
+          action={{ label: 'Add Account', onClick: () => setShowAddModal(true) }} 
+        />
+      ) : (
         <div style={{ display: 'grid', gap: 16 }}>
           {accounts.map(account => (
             <div key={account.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div><h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{account.email}</h3><p style={{ fontSize: 13, color: '#6b7280' }}>SMTP: {account.smtp_host}:{account.smtp_port} • IMAP: {account.imap_host}:{account.imap_port}</p></div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 18 }}>{account.email?.includes('gmail') ? '📧' : account.email?.includes('outlook') ? '📬' : '✉️'}</span>
+                    <h3 style={{ fontSize: 16, fontWeight: 600 }}>{account.email}</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: '#6b7280' }}>
+                    SMTP: {account.smtp_host}:{account.smtp_port} • IMAP: {account.imap_host}:{account.imap_port}
+                  </p>
+                  <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
+                    Sent today: {account.emails_sent_today || 0} / {account.daily_limit || 50}
+                  </p>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <StatusBadge status={account.status} />
-                  <button onClick={() => handleTest(account)} disabled={testingId === account.id} style={iconButtonStyle}>{testingId === account.id ? <RefreshCw size={14} /> : <Check size={14} />}</button>
-                  <button onClick={() => handleDelete(account.id)} style={{ ...iconButtonStyle, background: '#fee2e2', color: '#991b1b' }}><Trash2 size={16} /></button>
+                  <button onClick={() => handleTest(account)} disabled={testingId === account.id} style={iconButtonStyle}>
+                    {testingId === account.id ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}
+                  </button>
+                  <button onClick={() => handleDelete(account.id)} style={{ ...iconButtonStyle, background: '#fee2e2', color: '#991b1b' }}>
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
             </div>
           ))}
         </div>
       )}
-      {showAddModal && <AddWarmingAccountModal onClose={() => setShowAddModal(false)} onSuccess={() => { setShowAddModal(false); fetchAccounts(); showNotification('Account added!', 'success'); }} getToken={getToken} />}
+
+      {showAddModal && (
+        <AddWarmingAccountModal 
+          onClose={() => setShowAddModal(false)} 
+          onSuccess={() => { setShowAddModal(false); fetchAccounts(); showNotification('Account added!', 'success'); }} 
+          getToken={getToken}
+          showNotification={showNotification}
+        />
+      )}
+
+      {showGmailGuide && <GmailSetupGuideModal onClose={() => setShowGmailGuide(false)} />}
     </div>
   );
 }
 
-function AddWarmingAccountModal({ onClose, onSuccess, getToken }) {
-  const [form, setForm] = useState({ email: '', smtp_host: '', smtp_port: 587, smtp_user: '', smtp_pass: '', imap_host: '', imap_port: 993 });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+// Quick Setup Card Component
+function QuickSetupCard({ provider, icon, color, description, onClick }) {
+  return (
+    <div 
+      onClick={onClick}
+      style={{ 
+        background: 'white', 
+        borderRadius: 12, 
+        border: '2px solid #e5e7eb', 
+        padding: 20, 
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+      }}
+      onMouseOver={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+      onMouseOut={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.transform = 'translateY(0)'; }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+        <span style={{ fontSize: 28 }}>{icon}</span>
+        <div>
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: '#111827' }}>{provider}</h3>
+          <p style={{ fontSize: 13, color: '#6b7280' }}>{description}</p>
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, color, fontSize: 13, fontWeight: 500 }}>
+        Quick Setup <ChevronRight size={14} />
+      </div>
+    </div>
+  );
+}
 
-  const handleSubmit = async (e) => { e.preventDefault(); setLoading(true); setError(''); try { await apiCall('/api/warming/accounts', { method: 'POST', body: JSON.stringify(form) }, getToken()); onSuccess(); } catch (err) { setError(err.message); } finally { setLoading(false); } };
+// Gmail Setup Guide Modal
+function GmailSetupGuideModal({ onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  const copyLink = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
-    <Modal title="Add Warming Account" onClose={onClose}>
-      <form onSubmit={handleSubmit}>
-        {error && <ErrorMessage message={error} />}
-        <FormField label="Email Address" required><input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} required style={inputStyle} /></FormField>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-          <FormField label="SMTP Host" required><input type="text" value={form.smtp_host} onChange={e => setForm({...form, smtp_host: e.target.value})} placeholder="smtp.gmail.com" required style={inputStyle} /></FormField>
-          <FormField label="SMTP Port" required><input type="number" value={form.smtp_port} onChange={e => setForm({...form, smtp_port: parseInt(e.target.value)})} required style={inputStyle} /></FormField>
+    <Modal title="Gmail App Password Setup" onClose={onClose} width={600}>
+      <div style={{ lineHeight: 1.7 }}>
+        <div style={{ background: '#fef3c7', borderRadius: 8, padding: 16, marginBottom: 24, display: 'flex', gap: 12 }}>
+          <AlertTriangle size={20} color="#d97706" style={{ flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontSize: 14, color: '#92400e' }}>
+            <strong>Important:</strong> Gmail requires an "App Password" — your regular password won't work.
+          </div>
         </div>
-        <FormField label="SMTP Username" required><input type="text" value={form.smtp_user} onChange={e => setForm({...form, smtp_user: e.target.value})} required style={inputStyle} /></FormField>
-        <FormField label="SMTP Password" required><input type="password" value={form.smtp_pass} onChange={e => setForm({...form, smtp_pass: e.target.value})} required style={inputStyle} /></FormField>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
-          <FormField label="IMAP Host" required><input type="text" value={form.imap_host} onChange={e => setForm({...form, imap_host: e.target.value})} placeholder="imap.gmail.com" required style={inputStyle} /></FormField>
-          <FormField label="IMAP Port" required><input type="number" value={form.imap_port} onChange={e => setForm({...form, imap_port: parseInt(e.target.value)})} required style={inputStyle} /></FormField>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <StepItem 
+            number={1} 
+            title="Enable 2-Factor Authentication"
+            description="If not already enabled, go to your Google Account security settings."
+          >
+            <a 
+              href="https://myaccount.google.com/security" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#667eea', fontSize: 14, marginTop: 8 }}
+            >
+              Open Google Security Settings <ExternalLink size={14} />
+            </a>
+          </StepItem>
+
+          <StepItem 
+            number={2} 
+            title="Go to App Passwords"
+            description="Search for 'App Passwords' in your Google Account, or use the direct link below."
+          >
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <a 
+                href="https://myaccount.google.com/apppasswords" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#667eea', fontSize: 14 }}
+              >
+                Open App Passwords <ExternalLink size={14} />
+              </a>
+              <button 
+                onClick={() => copyLink('https://myaccount.google.com/apppasswords')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}
+              >
+                {copied ? <Check size={14} color="#10b981" /> : <Copy size={14} />} {copied ? 'Copied!' : 'Copy link'}
+              </button>
+            </div>
+          </StepItem>
+
+          <StepItem 
+            number={3} 
+            title="Create App Password"
+            description='Enter a name like "Cold Email Tool" and click Create.'
+          />
+
+          <StepItem 
+            number={4} 
+            title="Copy the 16-character password"
+            description="Google will show a 16-character password (like 'abcd efgh ijkl mnop'). Copy it without spaces."
+          />
+
+          <StepItem 
+            number={5} 
+            title="Use it in this app"
+            description="Paste the App Password in the SMTP Password field when adding your Gmail account."
+          />
         </div>
-        <div style={{ display: 'flex', gap: 12, marginTop: 24 }}><button type="button" onClick={onClose} style={secondaryButtonStyle}>Cancel</button><button type="submit" disabled={loading} style={primaryButtonStyle}>{loading ? 'Adding...' : 'Add Account'}</button></div>
-      </form>
+
+        <div style={{ background: '#f3f4f6', borderRadius: 8, padding: 16, marginTop: 24 }}>
+          <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Gmail SMTP Settings (auto-filled for you)</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13, color: '#4b5563' }}>
+            <div><strong>SMTP Host:</strong> smtp.gmail.com</div>
+            <div><strong>SMTP Port:</strong> 587</div>
+            <div><strong>IMAP Host:</strong> imap.gmail.com</div>
+            <div><strong>IMAP Port:</strong> 993</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+          <button onClick={onClose} style={primaryButtonStyle}>Got it!</button>
+        </div>
+      </div>
     </Modal>
   );
 }
 
+// Step Item Component for Guide
+function StepItem({ number, title, description, children }) {
+  return (
+    <div style={{ display: 'flex', gap: 16 }}>
+      <div style={{ 
+        width: 32, 
+        height: 32, 
+        borderRadius: '50%', 
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+        color: 'white', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        fontWeight: 'bold',
+        fontSize: 14,
+        flexShrink: 0
+      }}>
+        {number}
+      </div>
+      <div style={{ flex: 1 }}>
+        <h4 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{title}</h4>
+        <p style={{ fontSize: 14, color: '#6b7280', margin: 0 }}>{description}</p>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Updated Add Warming Account Modal with Quick Fill
+function AddWarmingAccountModal({ onClose, onSuccess, getToken, showNotification }) {
+  const [form, setForm] = useState({ 
+    email: '', 
+    smtp_host: '', 
+    smtp_port: 587, 
+    smtp_user: '', 
+    smtp_pass: '', 
+    imap_host: '', 
+    imap_port: 993 
+  });
+  const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [error, setError] = useState('');
+  const [activePreset, setActivePreset] = useState(null);
+
+  // Preset configurations
+  const presets = {
+    gmail: {
+      smtp_host: 'smtp.gmail.com',
+      smtp_port: 587,
+      imap_host: 'imap.gmail.com',
+      imap_port: 993
+    },
+    outlook: {
+      smtp_host: 'smtp.office365.com',
+      smtp_port: 587,
+      imap_host: 'outlook.office365.com',
+      imap_port: 993
+    }
+  };
+
+  // Listen for prefill events
+  useEffect(() => {
+    const handleGmail = () => { applyPreset('gmail'); };
+    const handleOutlook = () => { applyPreset('outlook'); };
+    
+    window.addEventListener('prefill-gmail', handleGmail);
+    window.addEventListener('prefill-outlook', handleOutlook);
+    
+    return () => {
+      window.removeEventListener('prefill-gmail', handleGmail);
+      window.removeEventListener('prefill-outlook', handleOutlook);
+    };
+  }, []);
+
+  const applyPreset = (preset) => {
+    const config = presets[preset];
+    if (config) {
+      setForm(prev => ({ ...prev, ...config }));
+      setActivePreset(preset);
+    }
+  };
+
+  const handleTest = async () => {
+    if (!form.smtp_host || !form.smtp_user || !form.smtp_pass) {
+      setError('Fill in SMTP settings first');
+      return;
+    }
+    setTesting(true);
+    setError('');
+    try {
+      await apiCall('/api/smtp/test', { 
+        method: 'POST', 
+        body: JSON.stringify({
+          smtp_host: form.smtp_host,
+          smtp_port: form.smtp_port,
+          smtp_user: form.smtp_user,
+          smtp_pass: form.smtp_pass
+        }) 
+      }, getToken());
+      showNotification('Connection successful! ✓', 'success');
+    } catch (err) {
+      setError(`Connection failed: ${err.message}`);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSubmit = async (e) => { 
+    e.preventDefault(); 
+    setLoading(true); 
+    setError(''); 
+    try { 
+      await apiCall('/api/warming/accounts', { method: 'POST', body: JSON.stringify(form) }, getToken()); 
+      onSuccess(); 
+    } catch (err) { 
+      setError(err.message); 
+    } finally { 
+      setLoading(false); 
+    } 
+  };
+
+  return (
+    <Modal title="Add Warming Account" onClose={onClose} width={550}>
+      <form onSubmit={handleSubmit}>
+        {/* Quick Fill Buttons */}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 500, color: '#374151' }}>
+            Quick Setup
+          </label>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button 
+              type="button" 
+              onClick={() => applyPreset('gmail')}
+              style={{ 
+                ...secondaryButtonStyle, 
+                flex: 1,
+                background: activePreset === 'gmail' ? '#fef2f2' : 'white',
+                borderColor: activePreset === 'gmail' ? '#EA4335' : '#e5e7eb',
+                color: activePreset === 'gmail' ? '#EA4335' : '#374151'
+              }}
+            >
+              <span style={{ fontSize: 18 }}>📧</span> Gmail
+            </button>
+            <button 
+              type="button" 
+              onClick={() => applyPreset('outlook')}
+              style={{ 
+                ...secondaryButtonStyle, 
+                flex: 1,
+                background: activePreset === 'outlook' ? '#eff6ff' : 'white',
+                borderColor: activePreset === 'outlook' ? '#0078D4' : '#e5e7eb',
+                color: activePreset === 'outlook' ? '#0078D4' : '#374151'
+              }}
+            >
+              <span style={{ fontSize: 18 }}>📬</span> Outlook
+            </button>
+          </div>
+        </div>
+
+        {error && <ErrorMessage message={error} />}
+
+        {/* Email & Username */}
+        <FormField label="Email Address" required>
+          <input 
+            type="email" 
+            value={form.email} 
+            onChange={e => {
+              setForm({...form, email: e.target.value, smtp_user: e.target.value});
+            }} 
+            placeholder="you@gmail.com"
+            required 
+            style={inputStyle} 
+          />
+        </FormField>
+
+        {/* SMTP Settings */}
+        <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+          <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: '#374151' }}>SMTP Settings (Sending)</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+            <FormField label="Host">
+              <input 
+                type="text" 
+                value={form.smtp_host} 
+                onChange={e => setForm({...form, smtp_host: e.target.value})} 
+                placeholder="smtp.gmail.com" 
+                required 
+                style={inputStyle} 
+              />
+            </FormField>
+            <FormField label="Port">
+              <input 
+                type="number" 
+                value={form.smtp_port} 
+                onChange={e => setForm({...form, smtp_port: parseInt(e.target.value)})} 
+                required 
+                style={inputStyle} 
+              />
+            </FormField>
+          </div>
+          <FormField label="Username">
+            <input 
+              type="text" 
+              value={form.smtp_user} 
+              onChange={e => setForm({...form, smtp_user: e.target.value})} 
+              placeholder="you@gmail.com"
+              required 
+              style={inputStyle} 
+            />
+          </FormField>
+          <FormField label={
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              Password / App Password
+              {activePreset === 'gmail' && (
+                <span style={{ fontSize: 11, color: '#EA4335', fontWeight: 400 }}>
+                  (Use Gmail App Password)
+                </span>
+              )}
+            </span>
+          }>
+            <input 
+              type="password" 
+              value={form.smtp_pass} 
+              onChange={e => setForm({...form, smtp_pass: e.target.value})} 
+              placeholder={activePreset === 'gmail' ? "16-character app password" : "••••••••"}
+              required 
+              style={inputStyle} 
+            />
+          </FormField>
+        </div>
+
+        {/* IMAP Settings */}
+        <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+          <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: '#374151' }}>IMAP Settings (Receiving)</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+            <FormField label="Host">
+              <input 
+                type="text" 
+                value={form.imap_host} 
+                onChange={e => setForm({...form, imap_host: e.target.value})} 
+                placeholder="imap.gmail.com" 
+                required 
+                style={inputStyle} 
+              />
+            </FormField>
+            <FormField label="Port">
+              <input 
+                type="number" 
+                value={form.imap_port} 
+                onChange={e => setForm({...form, imap_port: parseInt(e.target.value)})} 
+                required 
+                style={inputStyle} 
+              />
+            </FormField>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+          <button type="button" onClick={onClose} style={secondaryButtonStyle}>
+            Cancel
+          </button>
+          <button 
+            type="button" 
+            onClick={handleTest} 
+            disabled={testing}
+            style={{ ...secondaryButtonStyle, minWidth: 120 }}
+          >
+            {testing ? (
+              <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Testing...</>
+            ) : (
+              <><Check size={14} /> Test Connection</>
+            )}
+          </button>
+          <button type="submit" disabled={loading} style={{ ...primaryButtonStyle, flex: 1 }}>
+            {loading ? 'Adding...' : 'Add Account'}
+          </button>
+        </div>
+      </form>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </Modal>
+  );
+}
 // =============================================================================
 // CONTACTS PAGE
 // =============================================================================
