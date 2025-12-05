@@ -356,7 +356,7 @@ function OverviewItem({ icon: Icon, label, value, color = '#667eea' }) {
 // WARMING CONTROL PANEL
 // =============================================================================
 
-function WarmingControlPanel({ getToken, showNotification, accounts }) {
+function WarmingControlPanel({ getToken, showNotification, domains }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
@@ -392,9 +392,11 @@ function WarmingControlPanel({ getToken, showNotification, accounts }) {
     return () => clearInterval(interval);
   }, [fetchStatus]);
 
+  const verifiedDomains = domains?.filter(d => d.warming_status === 'verified') || [];
+
   const handleStart = async () => {
-    if (accounts.length < 2) {
-      showNotification('Add at least 2 email accounts to start warming', 'warning');
+    if (verifiedDomains.length === 0) {
+      showNotification('Enable warming on at least one domain first (from Domains page)', 'warning');
       return;
     }
     setStarting(true);
@@ -445,7 +447,7 @@ function WarmingControlPanel({ getToken, showNotification, accounts }) {
               {isActive ? '● Active' : '○ Inactive'}
             </span>
           </div>
-          <p style={{ color: '#6b7280', fontSize: 14, margin: 0 }}>Automatically send emails between your accounts to build reputation</p>
+          <p style={{ color: '#6b7280', fontSize: 14, margin: 0 }}>Automatically send emails between your domains to build reputation</p>
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={() => setShowConfig(!showConfig)} style={secondaryButtonStyle}><Settings size={16} /> Configure</button>
@@ -455,7 +457,7 @@ function WarmingControlPanel({ getToken, showNotification, accounts }) {
               {stopping ? 'Stopping...' : 'Stop Warming'}
             </button>
           ) : (
-            <button onClick={handleStart} disabled={starting || accounts.length < 2} style={primaryButtonStyle}>
+            <button onClick={handleStart} disabled={starting || verifiedDomains.length === 0} style={primaryButtonStyle}>
               {starting ? <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={16} />}
               {starting ? 'Starting...' : 'Start Warming'}
             </button>
@@ -463,10 +465,10 @@ function WarmingControlPanel({ getToken, showNotification, accounts }) {
         </div>
       </div>
 
-      {accounts.length < 2 && (
+      {verifiedDomains.length === 0 && (
         <div style={{ background: '#fef3c7', borderRadius: 8, padding: 16, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
           <AlertTriangle size={20} color="#d97706" />
-          <span style={{ color: '#92400e', fontSize: 14 }}>Add at least 2 email accounts to enable auto warming. Your accounts will send emails to each other.</span>
+          <span style={{ color: '#92400e', fontSize: 14 }}>Enable warming on a domain first. Go to <strong>Domains</strong> and click "Enable Warming" on a configured domain.</span>
         </div>
       )}
 
@@ -526,131 +528,101 @@ function WarmingControlPanel({ getToken, showNotification, accounts }) {
 }
 
 // =============================================================================
-// WARMING PAGE
+// WARMING PAGE (Resend-based)
 // =============================================================================
 
 function WarmingPage({ getToken, showNotification }) {
-  const [accounts, setAccounts] = useState([]);
+  const [domains, setDomains] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showGmailGuide, setShowGmailGuide] = useState(false);
-  const [testingId, setTestingId] = useState(null);
 
-  const fetchAccounts = useCallback(async () => {
+  const fetchDomains = useCallback(async () => {
     try { 
-      const data = await apiCall('/api/warming/accounts', {}, getToken()); 
-      setAccounts(data.accounts || []); 
+      const data = await apiCall('/api/warming/domains', {}, getToken()); 
+      setDomains(data.domains || []); 
     } catch (error) { 
-      showNotification('Failed to fetch accounts', 'error'); 
+      // If no warming domains yet, that's fine
+      setDomains([]);
     } finally { 
       setLoading(false); 
     }
-  }, [getToken, showNotification]);
+  }, [getToken]);
 
-  useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
-
-  const handleDelete = async (id) => { 
-    if (!window.confirm('Delete this account?')) return; 
-    try { 
-      await apiCall(`/api/warming/accounts/${id}`, { method: 'DELETE' }, getToken()); 
-      showNotification('Account deleted', 'success'); 
-      fetchAccounts(); 
-    } catch (error) { 
-      showNotification('Failed to delete', 'error'); 
-    } 
-  };
-  
-  const handleTest = async (account) => { 
-    setTestingId(account.id); 
-    try { 
-      await apiCall('/api/smtp/test', { method: 'POST', body: JSON.stringify(account) }, getToken()); 
-      showNotification('SMTP connection successful!', 'success'); 
-    } catch (error) { 
-      showNotification(`SMTP test failed: ${error.message}`, 'error'); 
-    } finally { 
-      setTestingId(null); 
-    } 
-  };
+  useEffect(() => { fetchDomains(); }, [fetchDomains]);
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
         <div>
           <h1 style={{ fontSize: 32, fontWeight: 'bold', marginBottom: 8 }}>Email Warming</h1>
-          <p style={{ color: '#6b7280' }}>Warm up your email accounts to improve deliverability</p>
-        </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <button onClick={() => setShowGmailGuide(true)} style={secondaryButtonStyle}>
-            <Mail size={18} /> Gmail Setup Guide
-          </button>
-          <button onClick={() => setShowAddModal(true)} style={primaryButtonStyle}>
-            <Plus size={18} /> Add Account
-          </button>
+          <p style={{ color: '#6b7280' }}>Warm up your domains to improve email deliverability</p>
         </div>
       </div>
 
       {/* Auto Warming Control Panel */}
-      <WarmingControlPanel getToken={getToken} showNotification={showNotification} accounts={accounts} />
+      <WarmingControlPanel getToken={getToken} showNotification={showNotification} domains={domains} />
 
-      {/* Quick Setup Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 32 }}>
-        <QuickSetupCard 
-          provider="Gmail"
-          icon="📧"
-          color="#EA4335"
-          description="Personal or Workspace accounts"
-          onClick={() => { setShowAddModal(true); setTimeout(() => window.dispatchEvent(new CustomEvent('prefill-gmail')), 100); }}
-        />
-        <QuickSetupCard 
-          provider="Outlook"
-          icon="📬"
-          color="#0078D4"
-          description="Outlook.com or Microsoft 365"
-          onClick={() => { setShowAddModal(true); setTimeout(() => window.dispatchEvent(new CustomEvent('prefill-outlook')), 100); }}
-        />
-        <QuickSetupCard 
-          provider="Custom SMTP"
-          icon="⚙️"
-          color="#6B7280"
-          description="Any email provider"
-          onClick={() => setShowAddModal(true)}
-        />
+      {/* How It Works */}
+      <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 24 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>🚀 How Resend Warming Works</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 24 }}>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>1</div>
+            <div>
+              <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Buy or Import Domain</h3>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>Get a domain from the Domains page. Configure DNS.</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>2</div>
+            <div>
+              <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Enable Warming</h3>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>Click "Enable Warming" on your domain. DNS is auto-configured.</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>3</div>
+            <div>
+              <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Start Warming</h3>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>Click Start above. Emails auto-send between your addresses.</p>
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* Warming Domains */}
       {loading ? (
-        <LoadingState message="Loading accounts..." />
-      ) : accounts.length === 0 ? (
+        <LoadingState message="Loading warming domains..." />
+      ) : domains.length === 0 ? (
         <EmptyState 
           icon={Flame} 
-          title="No Warming Accounts" 
-          description="Add email accounts to start warming. Click Gmail or Outlook above for quick setup." 
-          action={{ label: 'Add Account', onClick: () => setShowAddModal(true) }} 
+          title="No Warming Domains" 
+          description="Enable warming on a domain to get started. Go to Domains → Click 'Enable Warming' on a configured domain." 
+          action={{ label: 'Go to Domains', onClick: () => window.location.hash = '#domains' }} 
         />
       ) : (
         <div style={{ display: 'grid', gap: 16 }}>
-          {accounts.map(account => (
-            <div key={account.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Warming-Enabled Domains</h2>
+          {domains.map(domain => (
+            <div key={domain.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 18 }}>{account.email?.includes('gmail') ? '📧' : account.email?.includes('outlook') ? '📬' : '✉️'}</span>
-                    <h3 style={{ fontSize: 16, fontWeight: 600 }}>{account.email}</h3>
+                    <Globe size={18} color="#667eea" />
+                    <h3 style={{ fontSize: 16, fontWeight: 600 }}>{domain.domain_name}</h3>
+                    <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: domain.warming_status === 'verified' ? '#d1fae5' : '#fef3c7', color: domain.warming_status === 'verified' ? '#065f46' : '#92400e' }}>
+                      {domain.warming_status === 'verified' ? '✓ Verified' : '⏳ Pending'}
+                    </span>
                   </div>
                   <p style={{ fontSize: 13, color: '#6b7280' }}>
-                    SMTP: {account.smtp_host}:{account.smtp_port} • IMAP: {account.imap_host}:{account.imap_port}
-                  </p>
-                  <p style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>
-                    Sent today: {account.emails_sent_today || 0} / {account.daily_limit || 50}
+                    Addresses: {domain.addresses?.filter(a => a).join(', ') || 'team@, hello@, contact@, info@'}
                   </p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <StatusBadge status={account.status} />
-                  <button onClick={() => handleTest(account)} disabled={testingId === account.id} style={iconButtonStyle}>
-                    {testingId === account.id ? <RefreshCw size={14} className="spin" /> : <Check size={14} />}
-                  </button>
-                  <button onClick={() => handleDelete(account.id)} style={{ ...iconButtonStyle, background: '#fee2e2', color: '#991b1b' }}>
-                    <Trash2 size={16} />
-                  </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {domain.warming_status === 'verified' && (
+                    <span style={{ padding: '6px 12px', background: '#d1fae5', color: '#065f46', borderRadius: 6, fontSize: 13, fontWeight: 500 }}>
+                      Ready to warm 🔥
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -658,16 +630,18 @@ function WarmingPage({ getToken, showNotification }) {
         </div>
       )}
 
-      {showAddModal && (
-        <AddWarmingAccountModal 
-          onClose={() => setShowAddModal(false)} 
-          onSuccess={() => { setShowAddModal(false); fetchAccounts(); showNotification('Account added!', 'success'); }} 
-          getToken={getToken}
-          showNotification={showNotification}
-        />
-      )}
-
-      {showGmailGuide && <GmailSetupGuideModal onClose={() => setShowGmailGuide(false)} />}
+      {/* Benefits Section */}
+      <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: 12, padding: 24, marginTop: 24, color: 'white' }}>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>✨ Why Resend-Based Warming?</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>No SMTP passwords needed</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>Automatic DNS setup</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>Works with any domain</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>AI-powered responses</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>Natural conversation threads</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>3,000 emails/mo free</span></div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1496,25 +1470,75 @@ function ImportDomainsModal({ onClose, onImport, getToken }) {
 
 function DomainCard({ domain, onConfigure, onDelete, getToken, showNotification, onRefresh }) {
   const [configuring, setConfiguring] = useState(false);
+  const [enablingWarming, setEnablingWarming] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+
   const handleQuickSetup = async () => { setConfiguring(true); try { await apiCall(`/api/domains/${domain.id}/configure-dns`, { method: 'POST' }, getToken()); showNotification('DNS configured!', 'success'); onRefresh(); } catch (error) { showNotification('Setup failed: ' + error.message, 'error'); } finally { setConfiguring(false); } };
+
+  const handleEnableWarming = async () => {
+    setEnablingWarming(true);
+    try {
+      await apiCall(`/api/domains/${domain.id}/enable-warming`, { method: 'POST' }, getToken());
+      showNotification('🔥 Warming enabled! DNS records added.', 'success');
+      onRefresh();
+    } catch (error) {
+      showNotification('Failed: ' + error.message, 'error');
+    } finally {
+      setEnablingWarming(false);
+    }
+  };
+
+  const handleCheckWarmingStatus = async () => {
+    setCheckingStatus(true);
+    try {
+      const status = await apiCall(`/api/domains/${domain.id}/warming-status`, {}, getToken());
+      if (status.verified) {
+        showNotification('✅ Domain verified! Ready to warm.', 'success');
+      } else {
+        showNotification(`Status: ${status.status}. DNS may still be propagating.`, 'info');
+      }
+      onRefresh();
+    } catch (error) {
+      showNotification('Check failed: ' + error.message, 'error');
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
 
   return (
     <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}><Globe size={20} color="#667eea" /><h3 style={{ fontSize: 18, fontWeight: 600 }}>{domain.domain_name}</h3><StatusBadge status={domain.status} /></div>
-          <div style={{ display: 'flex', gap: 24, marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 24, marginTop: 16, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: domain.dns_configured ? '#10b981' : '#f59e0b' }} /><Server size={14} color="#6b7280" /><span style={{ fontSize: 13, color: '#6b7280' }}>DNS</span></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: domain.email_routing_enabled ? '#10b981' : '#f59e0b' }} /><Mail size={14} color="#6b7280" /><span style={{ fontSize: 13, color: '#6b7280' }}>Email Routing</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: domain.warming_status === 'verified' ? '#10b981' : domain.warming_enabled ? '#f59e0b' : '#d1d5db' }} /><Flame size={14} color="#6b7280" /><span style={{ fontSize: 13, color: '#6b7280' }}>Warming {domain.warming_status === 'verified' ? '✓' : domain.warming_enabled ? '(pending)' : ''}</span></div>
             {domain.forward_to && <div style={{ fontSize: 13, color: '#6b7280' }}>Forwards to: <strong>{domain.forward_to}</strong></div>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {!domain.dns_configured && <button onClick={handleQuickSetup} disabled={configuring} style={{ ...primaryButtonStyle, padding: '8px 16px', fontSize: 13 }}>{configuring ? 'Setting up...' : 'Quick Setup'}</button>}
+          {!domain.warming_enabled && domain.dns_configured && (
+            <button onClick={handleEnableWarming} disabled={enablingWarming} style={{ ...secondaryButtonStyle, padding: '8px 16px', fontSize: 13, background: '#fef3c7', color: '#92400e' }}>
+              <Flame size={14} />{enablingWarming ? 'Enabling...' : 'Enable Warming'}
+            </button>
+          )}
+          {domain.warming_enabled && domain.warming_status !== 'verified' && (
+            <button onClick={handleCheckWarmingStatus} disabled={checkingStatus} style={{ ...secondaryButtonStyle, padding: '8px 16px', fontSize: 13 }}>
+              <RefreshCw size={14} />{checkingStatus ? 'Checking...' : 'Check Status'}
+            </button>
+          )}
           <button onClick={onConfigure} style={iconButtonStyle}><Settings size={16} /></button>
           <button onClick={onDelete} style={{ ...iconButtonStyle, background: '#fee2e2', color: '#991b1b' }}><Trash2 size={16} /></button>
         </div>
       </div>
+      {domain.warming_enabled && domain.warming_status === 'verified' && (
+        <div style={{ marginTop: 16, padding: 12, background: '#d1fae5', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CheckCircle size={16} color="#065f46" />
+          <span style={{ color: '#065f46', fontSize: 13 }}>Warming ready! Emails: team@, hello@, contact@, info@{domain.domain_name}</span>
+        </div>
+      )}
     </div>
   );
 }
