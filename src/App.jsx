@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Home, Flame, Users as UsersIcon, Mail, Settings, Shield, AlertCircle } from 'lucide-react';
+import { Menu, Home, Flame, Users as UsersIcon, Mail, Settings, Shield } from 'lucide-react';
 import { AuthProvider, useAuth, LoginPage, UserManagement, LogoutButton } from './AuthComponents';
 
 // =============================================================================
@@ -345,23 +345,29 @@ function TopBar({ setSidebarOpen }) {
 // =============================================================================
 
 function Dashboard() {
+  const { getToken } = useAuth();
   const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/health`);
+        const response = await fetch(`${API_BASE_URL}/health`, {
+          headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
         if (response.ok) {
           const data = await response.json();
           setStats(data);
         }
       } catch (error) {
         console.error('Failed to fetch stats:', error);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchStats();
-  }, []);
+  }, [getToken]);
 
   return (
     <div>
@@ -372,28 +378,6 @@ function Dashboard() {
         <p style={{ color: '#6b7280' }}>
           Welcome to your cold email campaign manager
         </p>
-      </div>
-
-      {/* Warning Banner */}
-      <div style={{
-        background: '#fef3c7',
-        border: '1px solid #fcd34d',
-        borderRadius: '10px',
-        padding: '16px',
-        marginBottom: '32px',
-        display: 'flex',
-        gap: '12px'
-      }}>
-        <AlertCircle size={20} color="#92400e" style={{ flexShrink: 0 }} />
-        <div>
-          <p style={{ fontSize: '14px', fontWeight: '600', color: '#92400e', marginBottom: '4px' }}>
-            Backend Authentication Required
-          </p>
-          <p style={{ fontSize: '13px', color: '#78350f' }}>
-            To enable full functionality, add authentication to your backend server. 
-            See AUTH_INTEGRATION_GUIDE.txt for instructions.
-          </p>
-        </div>
       </div>
 
       {/* Stats Grid */}
@@ -408,24 +392,28 @@ function Dashboard() {
           label="Active Campaigns"
           value={stats?.campaigns || 0}
           color="#667eea"
+          loading={loading}
         />
         <StatCard
           icon={Flame}
-          label="Warming Campaigns"
-          value={stats?.warmingCampaigns || 0}
+          label="Warming Accounts"
+          value={stats?.warmingAccounts || 0}
           color="#f59e0b"
+          loading={loading}
         />
         <StatCard
           icon={UsersIcon}
           label="Total Contacts"
           value={0}
           color="#10b981"
+          loading={loading}
         />
         <StatCard
           icon={Mail}
           label="Emails Sent"
           value={0}
           color="#3b82f6"
+          loading={loading}
         />
       </div>
 
@@ -441,8 +429,8 @@ function Dashboard() {
         }}>
           <QuickActionCard
             icon={Flame}
-            title="Start Warming"
-            description="Warm up email accounts"
+            title="Add Warming Account"
+            description="Configure email warming"
           />
           <QuickActionCard
             icon={UsersIcon}
@@ -460,7 +448,7 @@ function Dashboard() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color }) {
+function StatCard({ icon: Icon, label, value, color, loading }) {
   return (
     <div style={{
       background: 'white',
@@ -491,7 +479,7 @@ function StatCard({ icon: Icon, label, value, color }) {
         fontWeight: 'bold',
         marginBottom: '4px'
       }}>
-        {value}
+        {loading ? '...' : value}
       </p>
       <p style={{ fontSize: '14px', color: '#6b7280' }}>
         {label}
@@ -538,6 +526,30 @@ function QuickActionCard({ icon: Icon, title, description }) {
 // =============================================================================
 
 function WarmingPage() {
+  const { getToken } = useAuth();
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/warming/accounts`, {
+          headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setAccounts(data.accounts || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch accounts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAccounts();
+  }, [getToken]);
+
   return (
     <div>
       <div style={{ marginBottom: '32px' }}>
@@ -549,8 +561,6 @@ function WarmingPage() {
         </p>
       </div>
 
-      <InfoBanner message="Add backend authentication to enable warming features" />
-
       <div style={{
         background: 'white',
         borderRadius: '12px',
@@ -560,10 +570,10 @@ function WarmingPage() {
       }}>
         <Flame size={48} color="#f59e0b" style={{ margin: '0 auto 16px' }} />
         <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
-          No Warming Accounts Yet
+          {loading ? 'Loading...' : accounts.length === 0 ? 'No Warming Accounts Yet' : `${accounts.length} Warming Account${accounts.length > 1 ? 's' : ''}`}
         </h3>
         <p style={{ fontSize: '14px', color: '#6b7280' }}>
-          Add backend authentication to start warming email accounts
+          {loading ? 'Fetching your warming accounts...' : accounts.length === 0 ? 'Add your first email account to start warming' : 'Manage your warming accounts'}
         </p>
       </div>
     </div>
@@ -575,6 +585,30 @@ function WarmingPage() {
 // =============================================================================
 
 function ContactsPage() {
+  const { getToken } = useAuth();
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/contacts`, {
+          headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setContacts(data.contacts || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch contacts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContacts();
+  }, [getToken]);
+
   return (
     <div>
       <div style={{ marginBottom: '32px' }}>
@@ -586,8 +620,6 @@ function ContactsPage() {
         </p>
       </div>
 
-      <InfoBanner message="Add backend authentication to manage contacts" />
-
       <div style={{
         background: 'white',
         borderRadius: '12px',
@@ -597,10 +629,10 @@ function ContactsPage() {
       }}>
         <UsersIcon size={48} color="#10b981" style={{ margin: '0 auto 16px' }} />
         <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
-          No Contacts Yet
+          {loading ? 'Loading...' : contacts.length === 0 ? 'No Contacts Yet' : `${contacts.length} Contact${contacts.length > 1 ? 's' : ''}`}
         </h3>
         <p style={{ fontSize: '14px', color: '#6b7280' }}>
-          Add backend authentication to import and manage contacts
+          {loading ? 'Fetching your contacts...' : contacts.length === 0 ? 'Import your first contact list' : 'Manage your contacts'}
         </p>
       </div>
     </div>
@@ -612,6 +644,30 @@ function ContactsPage() {
 // =============================================================================
 
 function CampaignsPage() {
+  const { getToken } = useAuth();
+  const [campaigns, setCampaigns] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/campaigns`, {
+          headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setCampaigns(data.campaigns || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch campaigns:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCampaigns();
+  }, [getToken]);
+
   return (
     <div>
       <div style={{ marginBottom: '32px' }}>
@@ -623,8 +679,6 @@ function CampaignsPage() {
         </p>
       </div>
 
-      <InfoBanner message="Add backend authentication to create campaigns" />
-
       <div style={{
         background: 'white',
         borderRadius: '12px',
@@ -634,10 +688,10 @@ function CampaignsPage() {
       }}>
         <Mail size={48} color="#3b82f6" style={{ margin: '0 auto 16px' }} />
         <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
-          No Campaigns Yet
+          {loading ? 'Loading...' : campaigns.length === 0 ? 'No Campaigns Yet' : `${campaigns.length} Campaign${campaigns.length > 1 ? 's' : ''}`}
         </h3>
         <p style={{ fontSize: '14px', color: '#6b7280' }}>
-          Add backend authentication to create and run email campaigns
+          {loading ? 'Fetching your campaigns...' : campaigns.length === 0 ? 'Create your first email campaign' : 'Manage your campaigns'}
         </p>
       </div>
     </div>
@@ -756,39 +810,15 @@ function SettingsPage() {
 
         <div style={{
           padding: '16px',
-          background: '#fef3c7',
-          border: '1px solid #fcd34d',
+          background: '#dbeafe',
+          border: '1px solid #93c5fd',
           borderRadius: '8px',
           fontSize: '13px',
-          color: '#92400e'
+          color: '#1e40af'
         }}>
-          Settings are stored locally. Backend authentication required for server-side storage.
+          💡 Settings are stored locally in your browser.
         </div>
       </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// HELPER COMPONENTS
-// =============================================================================
-
-function InfoBanner({ message }) {
-  return (
-    <div style={{
-      background: '#fef3c7',
-      border: '1px solid #fcd34d',
-      borderRadius: '10px',
-      padding: '12px 16px',
-      marginBottom: '24px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px'
-    }}>
-      <AlertCircle size={18} color="#92400e" />
-      <p style={{ fontSize: '13px', color: '#92400e' }}>
-        {message}
-      </p>
     </div>
   );
 }
