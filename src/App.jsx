@@ -687,27 +687,53 @@ function WarmingPage({ getToken, showNotification }) {
       {/* How It Works */}
       <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 24 }}>
         <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>🚀 How Resend Warming Works</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24 }}>
           <div style={{ display: 'flex', gap: 16 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>1</div>
             <div>
-              <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Buy or Import Domain</h3>
-              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>Get a domain from the Domains page. Configure DNS.</p>
+              <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Import Domain</h3>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>Get a domain from the Domains page.</p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>2</div>
             <div>
               <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Enable Warming</h3>
-              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>Click "Enable Warming" on your domain. DNS is auto-configured.</p>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>Auto-configures DNS + MX records.</p>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>3</div>
             <div>
-              <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Start Warming</h3>
-              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>Click Start above. Emails auto-send between your addresses.</p>
+              <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Setup Webhook</h3>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>One-time Resend webhook setup.</p>
             </div>
+          </div>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', flexShrink: 0 }}>4</div>
+            <div>
+              <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Start Warming</h3>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>Emails send & reply automatically.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Email Routing Info */}
+      <div style={{ background: '#dbeafe', borderRadius: 12, border: '1px solid #93c5fd', padding: 20, marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <Mail size={24} color="#2563eb" style={{ flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1e40af', marginBottom: 8 }}>Email Receiving via Cloudflare</h3>
+            <p style={{ fontSize: 14, color: '#1e40af', marginBottom: 8 }}>
+              Warming emails are received via Cloudflare Email Routing and forwarded to your inbox.
+            </p>
+            <ul style={{ fontSize: 13, color: '#1e40af', marginLeft: 20, marginBottom: 0 }}>
+              <li style={{ marginBottom: 4 }}>Click "Enable Receiving" on each domain below</li>
+              <li style={{ marginBottom: 4 }}>Check your inbox for Cloudflare's verification email</li>
+              <li style={{ marginBottom: 4 }}>Click the verification link to activate forwarding</li>
+              <li>All warming emails will then forward to your account email</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -727,29 +753,68 @@ function WarmingPage({ getToken, showNotification }) {
           <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Warming-Enabled Domains</h2>
           {domains.map(domain => (
             <div key={domain.id} style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <Globe size={18} color="#667eea" />
                     <h3 style={{ fontSize: 16, fontWeight: 600 }}>{domain.domain_name}</h3>
                     <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: domain.warming_status === 'verified' ? '#d1fae5' : '#fef3c7', color: domain.warming_status === 'verified' ? '#065f46' : '#92400e' }}>
                       {domain.warming_status === 'verified' ? '✓ Verified' : '⏳ Pending'}
                     </span>
                   </div>
-                  <p style={{ fontSize: 13, color: '#6b7280' }}>
+                  <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
                     Addresses: {domain.addresses?.filter(a => a).join(', ') || 'team@, hello@, contact@, info@'}
                   </p>
+                  {/* Status indicators */}
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: '#d1fae5', fontSize: 11, fontWeight: 600 }}>
+                      <Send size={12} color="#065f46" />
+                      <span style={{ color: '#065f46' }}>Sending ✓</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: domain.email_routing_enabled ? (domain.destination_verified ? '#d1fae5' : '#fef3c7') : '#fee2e2', fontSize: 11, fontWeight: 600 }}>
+                      <Mail size={12} color={domain.email_routing_enabled ? (domain.destination_verified ? '#065f46' : '#92400e') : '#dc2626'} />
+                      <span style={{ color: domain.email_routing_enabled ? (domain.destination_verified ? '#065f46' : '#92400e') : '#dc2626' }}>
+                        {domain.email_routing_enabled 
+                          ? (domain.destination_verified ? 'Receiving ✓' : 'Verify Email')
+                          : 'No Receiving'}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Forwarding info */}
+                  {domain.forward_to && (
+                    <p style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
+                      📧 Forwarding to: {domain.forward_to}
+                      {!domain.destination_verified && domain.email_routing_enabled && (
+                        <span style={{ color: '#d97706', marginLeft: 8 }}>
+                          ⚠️ Check inbox for verification email
+                        </span>
+                      )}
+                    </p>
+                  )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button 
-                    onClick={() => handleFixBounces(domain.id)} 
-                    disabled={fixingBounces === domain.id}
-                    style={{ ...secondaryButtonStyle, padding: '6px 12px', fontSize: 13 }}
-                  >
-                    {fixingBounces === domain.id ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Mail size={14} />}
-                    {fixingBounces === domain.id ? 'Fixing...' : 'Fix Bounces'}
-                  </button>
-                  {domain.warming_status === 'verified' && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                  {!domain.email_routing_enabled || !domain.destination_verified ? (
+                    <button 
+                      onClick={() => handleFixBounces(domain.id)} 
+                      disabled={fixingBounces === domain.id}
+                      style={{ 
+                        background: '#667eea', 
+                        color: 'white', 
+                        border: 'none', 
+                        padding: '8px 16px', 
+                        borderRadius: 8, 
+                        fontSize: 13, 
+                        fontWeight: 600, 
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      {fixingBounces === domain.id ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Mail size={14} />}
+                      {fixingBounces === domain.id ? 'Setting up...' : 'Enable Receiving'}
+                    </button>
+                  ) : (
                     <span style={{ padding: '6px 12px', background: '#d1fae5', color: '#065f46', borderRadius: 6, fontSize: 13, fontWeight: 500 }}>
                       Ready to warm 🔥
                     </span>
@@ -763,13 +828,13 @@ function WarmingPage({ getToken, showNotification }) {
 
       {/* Benefits Section */}
       <div style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: 12, padding: 24, marginTop: 24, color: 'white' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>✨ Why Resend-Based Warming?</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>✨ How Warming Works</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>No SMTP passwords needed</span></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>Automatic DNS setup</span></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>Works with any domain</span></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>AI-powered responses</span></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>Natural conversation threads</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>Resend sends emails</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>Cloudflare receives emails</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>Forwards to your inbox</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>No bounces possible</span></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>Auto MX configuration</span></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Check size={18} /><span>3,000 emails/mo free</span></div>
         </div>
       </div>
