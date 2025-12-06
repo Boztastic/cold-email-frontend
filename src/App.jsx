@@ -309,9 +309,26 @@ function DomainsPage() {
       if (data.verified) {
         alert('✅ Domain verified! Warming is ready.');
       } else {
-        alert(`Status: ${data.status}. Add DNS records in Resend dashboard.`);
+        alert(`Status: ${data.status}. Click "Sync DNS" to auto-add records.`);
       }
       loadDomains();
+    } catch (err) {
+      alert('Failed: ' + err.message);
+    }
+    setActionLoading(null);
+  };
+
+  const syncDns = async (domainId) => {
+    setActionLoading(domainId + '-dns');
+    try {
+      const res = await authFetch(`/api/domains/${domainId}/sync-dns`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`✅ ${data.message}`);
+        loadDomains();
+      } else {
+        alert(data.error || 'Failed to sync DNS');
+      }
     } catch (err) {
       alert('Failed: ' + err.message);
     }
@@ -408,13 +425,22 @@ function DomainsPage() {
                     </button>
                   )}
                   {domain.resend_domain_id && !domain.resend_verified && (
-                    <button 
-                      onClick={() => checkVerification(domain.id)} 
-                      style={styles.actionButton}
-                      disabled={actionLoading === domain.id + '-verify'}
-                    >
-                      {actionLoading === domain.id + '-verify' ? '...' : '🔄 Check DNS'}
-                    </button>
+                    <>
+                      <button 
+                        onClick={() => syncDns(domain.id)} 
+                        style={{...styles.actionButton, backgroundColor: '#f59e0b'}}
+                        disabled={actionLoading === domain.id + '-dns'}
+                      >
+                        {actionLoading === domain.id + '-dns' ? '...' : '🔄 Sync DNS'}
+                      </button>
+                      <button 
+                        onClick={() => checkVerification(domain.id)} 
+                        style={styles.actionButton}
+                        disabled={actionLoading === domain.id + '-verify'}
+                      >
+                        {actionLoading === domain.id + '-verify' ? '...' : '✓ Check Status'}
+                      </button>
+                    </>
                   )}
                   {domain.cloudflare_zone_id && !domain.inbox_enabled && (
                     <button 
