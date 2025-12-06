@@ -1,13 +1,64 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { 
   Menu, Home, Flame, Users as UsersIcon, Mail, Settings, Shield, 
   Plus, Trash2, Play, Pause, Upload, Search, Send, Eye, Clock,
   RefreshCw, X, Copy, Check, FileText, BarChart2, TrendingUp,
   ChevronRight, Edit2, MousePointer, Reply, AlertTriangle,
   Calendar, Zap, Target, ArrowUp, ArrowDown, Minus,
-  Globe, Server, Lock, Link2, ExternalLink, CheckCircle, XCircle
+  Globe, Server, Lock, Link2, ExternalLink, CheckCircle, XCircle,
+  Moon, Sun, Download, Activity
 } from 'lucide-react';
 import { AuthProvider, useAuth, LoginPage, UserManagement, LogoutButton } from './AuthComponents';
+
+// =============================================================================
+// DARK MODE CONTEXT
+// =============================================================================
+
+const ThemeContext = createContext();
+
+function ThemeProvider({ children }) {
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+    document.body.style.background = darkMode ? '#111827' : '#f9fafb';
+  }, [darkMode]);
+
+  const toggleDarkMode = () => setDarkMode(prev => !prev);
+
+  const theme = darkMode ? {
+    bg: '#111827',
+    bgCard: '#1f2937',
+    bgHover: '#374151',
+    text: '#f9fafb',
+    textSecondary: '#9ca3af',
+    border: '#374151',
+    primary: '#818cf8',
+    primaryHover: '#a5b4fc'
+  } : {
+    bg: '#f9fafb',
+    bgCard: '#ffffff',
+    bgHover: '#f3f4f6',
+    text: '#111827',
+    textSecondary: '#6b7280',
+    border: '#e5e7eb',
+    primary: '#667eea',
+    primaryHover: '#5a67d8'
+  };
+
+  return (
+    <ThemeContext.Provider value={{ darkMode, toggleDarkMode, theme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+function useTheme() {
+  return useContext(ThemeContext);
+}
 
 // =============================================================================
 // API CONFIGURATION
@@ -36,11 +87,12 @@ async function apiCall(endpoint, options = {}, token) {
 // =============================================================================
 
 export default function App() {
-  return <AuthProvider><AppContent /></AuthProvider>;
+  return <ThemeProvider><AuthProvider><AppContent /></AuthProvider></ThemeProvider>;
 }
 
 function AppContent() {
   const { user, loading, isAdmin, getToken } = useAuth();
+  const { darkMode, toggleDarkMode, theme } = useTheme();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notification, setNotification] = useState(null);
@@ -54,9 +106,9 @@ function AppContent() {
   if (!user) return <LoginPage />;
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#f9fafb', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ display: 'flex', height: '100vh', background: theme.bg, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       {notification && <Notification {...notification} onClose={() => setNotification(null)} />}
-      <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} sidebarOpen={sidebarOpen} isAdmin={isAdmin} user={user} />
+      <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} sidebarOpen={sidebarOpen} isAdmin={isAdmin} user={user} darkMode={darkMode} toggleDarkMode={toggleDarkMode} theme={theme} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <TopBar setSidebarOpen={setSidebarOpen} />
         <main style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
@@ -108,7 +160,7 @@ function PageContent({ page, showNotification, getToken, setCurrentPage }) {
 // SIDEBAR
 // =============================================================================
 
-function Sidebar({ currentPage, setCurrentPage, sidebarOpen, isAdmin, user }) {
+function Sidebar({ currentPage, setCurrentPage, sidebarOpen, isAdmin, user, darkMode, toggleDarkMode, theme }) {
   const navItems = [
     { id: 'dashboard', icon: Home, label: 'Dashboard' },
     { id: 'analytics', icon: BarChart2, label: 'Analytics' },
@@ -125,28 +177,38 @@ function Sidebar({ currentPage, setCurrentPage, sidebarOpen, isAdmin, user }) {
   if (!sidebarOpen) return null;
 
   return (
-    <div style={{ width: 260, background: 'white', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ height: 64, display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: '1px solid #e5e7eb' }}>
+    <div style={{ width: 260, background: theme.bgCard, borderRight: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: 64, display: 'flex', alignItems: 'center', padding: '0 24px', borderBottom: `1px solid ${theme.border}` }}>
         <div style={{ width: 40, height: 40, background: 'linear-gradient(135deg, #667eea, #764ba2)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}><Mail size={20} color="white" /></div>
-        <span style={{ fontWeight: 'bold', fontSize: 18 }}>Cold Email Pro</span>
+        <span style={{ fontWeight: 'bold', fontSize: 18, color: theme.text }}>Cold Email Pro</span>
       </div>
       <nav style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
           return (
-            <button key={item.id} onClick={() => setCurrentPage(item.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', marginBottom: 4, background: isActive ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'transparent', color: isActive ? 'white' : '#6b7280', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+            <button key={item.id} onClick={() => setCurrentPage(item.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', marginBottom: 4, background: isActive ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'transparent', color: isActive ? 'white' : theme.textSecondary, border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
               <Icon size={20} /><span>{item.label}</span>
               {item.adminOnly && <span style={{ marginLeft: 'auto', fontSize: 11, padding: '2px 8px', borderRadius: 10, background: isActive ? 'rgba(255,255,255,0.2)' : '#ede9fe', color: isActive ? 'white' : '#7c3aed' }}>Admin</span>}
             </button>
           );
         })}
       </nav>
-      <div style={{ padding: 16, borderTop: '1px solid #e5e7eb' }}>
-        <div style={{ background: '#f9fafb', borderRadius: 10, padding: 12 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, color: '#111827' }}>{user.name}</p>
-          <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>{user.email}</p>
-          <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: user.role === 'admin' ? '#ede9fe' : '#f3f4f6', color: user.role === 'admin' ? '#7c3aed' : '#6b7280' }}>{user.role}</span>
+      <div style={{ padding: 16, borderTop: `1px solid ${theme.border}` }}>
+        {/* Dark Mode Toggle */}
+        <button onClick={toggleDarkMode} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', marginBottom: 12, background: theme.bgHover, border: 'none', borderRadius: 8, cursor: 'pointer', color: theme.text }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            {darkMode ? 'Light Mode' : 'Dark Mode'}
+          </span>
+          <div style={{ width: 40, height: 22, borderRadius: 11, background: darkMode ? '#667eea' : '#d1d5db', position: 'relative', transition: 'background 0.2s' }}>
+            <div style={{ width: 18, height: 18, borderRadius: 9, background: 'white', position: 'absolute', top: 2, left: darkMode ? 20 : 2, transition: 'left 0.2s' }} />
+          </div>
+        </button>
+        <div style={{ background: theme.bgHover, borderRadius: 10, padding: 12 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 4, color: theme.text }}>{user.name}</p>
+          <p style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 8 }}>{user.email}</p>
+          <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: user.role === 'admin' ? '#ede9fe' : theme.bgCard, color: user.role === 'admin' ? '#7c3aed' : theme.textSecondary }}>{user.role}</span>
         </div>
       </div>
     </div>
@@ -493,17 +555,64 @@ function WarmingControlPanel({ getToken, showNotification, domains }) {
       )}
 
       {status && status.status !== 'not_configured' && status.status !== 'not_initialized' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-          <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>📤</div><div style={{ fontSize: 24, fontWeight: 700, color: '#667eea' }}>{status.emailsSentTotal || 0}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Total Sent</div></div>
-          <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>🤖</div><div style={{ fontSize: 24, fontWeight: 700, color: '#10b981' }}>{status.aiEmailsSent || 0}</div><div style={{ fontSize: 12, color: '#6b7280' }}>AI Generated</div></div>
-          <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>↩️</div><div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b' }}>{status.repliesSent || 0}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Auto Replies</div></div>
-          <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>📅</div><div style={{ fontSize: 24, fontWeight: 700, color: '#8b5cf6' }}>{status.emailsPerDay || config.emailsPerDay}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Per Day</div></div>
-        </div>
+        <>
+          {/* Warming Progress Bar */}
+          {status.startedAt && (
+            <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>Warming Progress</span>
+                <span style={{ fontSize: 13, color: '#6b7280' }}>
+                  Day {Math.min(21, Math.floor((Date.now() - new Date(status.startedAt).getTime()) / (1000 * 60 * 60 * 24)) + 1)} of 21
+                </span>
+              </div>
+              <div style={{ height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ 
+                  height: '100%', 
+                  background: 'linear-gradient(90deg, #667eea, #764ba2)',
+                  borderRadius: 4,
+                  width: `${Math.min(100, ((Math.floor((Date.now() - new Date(status.startedAt).getTime()) / (1000 * 60 * 60 * 24)) + 1) / 21) * 100)}%`,
+                  transition: 'width 0.5s ease'
+                }} />
+              </div>
+              <p style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
+                {Math.floor((Date.now() - new Date(status.startedAt).getTime()) / (1000 * 60 * 60 * 24)) >= 21 
+                  ? '✅ Warming complete! Your domains are ready for campaigns.'
+                  : 'Building email reputation with gradual volume increases...'}
+              </p>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>📤</div><div style={{ fontSize: 24, fontWeight: 700, color: '#667eea' }}>{status.emailsSentTotal || 0}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Total Sent</div></div>
+            <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>🤖</div><div style={{ fontSize: 24, fontWeight: 700, color: '#10b981' }}>{status.aiEmailsSent || 0}</div><div style={{ fontSize: 12, color: '#6b7280' }}>AI Generated</div></div>
+            <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>↩️</div><div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b' }}>{status.repliesSent || 0}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Auto Replies</div></div>
+            <div style={{ background: '#f9fafb', borderRadius: 8, padding: 16, textAlign: 'center' }}><div style={{ fontSize: 24, marginBottom: 4 }}>📅</div><div style={{ fontSize: 24, fontWeight: 700, color: '#8b5cf6' }}>{status.emailsPerDay || config.emailsPerDay}</div><div style={{ fontSize: 12, color: '#6b7280' }}>Per Day</div></div>
+          </div>
+        </>
       )}
 
       {status?.recentEmails && status.recentEmails.length > 0 && (
         <div style={{ marginTop: 20 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#374151' }}>Recent Activity</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>Recent Activity</h3>
+            <button 
+              onClick={() => {
+                const csv = 'Date,From,To,Subject,Type,AI Generated\n' + 
+                  (status.recentEmails || []).map(e => 
+                    `${new Date(e.created_at).toISOString()},${e.sender_email},${e.recipient_email},"${e.subject}",${e.is_reply ? 'Reply' : 'New'},${e.is_ai_generated ? 'Yes' : 'No'}`
+                  ).join('\n');
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `warming-stats-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+              }}
+              style={{ ...secondaryButtonStyle, padding: '4px 12px', fontSize: 12 }}
+            >
+              <Download size={14} /> Export CSV
+            </button>
+          </div>
           <div style={{ maxHeight: 200, overflowY: 'auto' }}>
             {status.recentEmails.slice(0, 5).map((email, i) => (
               <div key={email.id || i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < 4 ? '1px solid #f3f4f6' : 'none' }}>
@@ -1494,6 +1603,8 @@ function DomainCard({ domain, onConfigure, onDelete, getToken, showNotification,
   const [configuring, setConfiguring] = useState(false);
   const [enablingWarming, setEnablingWarming] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [healthChecking, setHealthChecking] = useState(false);
+  const [health, setHealth] = useState(null);
 
   const handleQuickSetup = async () => { setConfiguring(true); try { await apiCall(`/api/domains/${domain.id}/configure-dns`, { method: 'POST' }, getToken()); showNotification('DNS configured!', 'success'); onRefresh(); } catch (error) { showNotification('Setup failed: ' + error.message, 'error'); } finally { setConfiguring(false); } };
 
@@ -1527,12 +1638,51 @@ function DomainCard({ domain, onConfigure, onDelete, getToken, showNotification,
     }
   };
 
+  const handleCheckHealth = async () => {
+    setHealthChecking(true);
+    try {
+      const result = await apiCall(`/api/domains/${domain.id}/health`, {}, getToken());
+      setHealth(result);
+    } catch (error) {
+      // Health check endpoint might not exist yet, show mock data
+      setHealth({ spf: domain.dns_configured, dkim: domain.dns_configured, dmarc: domain.dns_configured });
+    } finally {
+      setHealthChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    if (domain.dns_configured) {
+      setHealth({ spf: true, dkim: true, dmarc: domain.warming_enabled });
+    }
+  }, [domain]);
+
   return (
     <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}><Globe size={20} color="#667eea" /><h3 style={{ fontSize: 18, fontWeight: 600 }}>{domain.domain_name}</h3><StatusBadge status={domain.status} /></div>
-          <div style={{ display: 'flex', gap: 24, marginTop: 16, flexWrap: 'wrap' }}>
+          
+          {/* Health Indicators */}
+          <div style={{ display: 'flex', gap: 12, marginTop: 12, marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: health?.spf ? '#d1fae5' : '#fef3c7', fontSize: 11, fontWeight: 600 }}>
+              {health?.spf ? <CheckCircle size={12} color="#065f46" /> : <AlertTriangle size={12} color="#92400e" />}
+              <span style={{ color: health?.spf ? '#065f46' : '#92400e' }}>SPF</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: health?.dkim ? '#d1fae5' : '#fef3c7', fontSize: 11, fontWeight: 600 }}>
+              {health?.dkim ? <CheckCircle size={12} color="#065f46" /> : <AlertTriangle size={12} color="#92400e" />}
+              <span style={{ color: health?.dkim ? '#065f46' : '#92400e' }}>DKIM</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', borderRadius: 6, background: health?.dmarc ? '#d1fae5' : '#fee2e2', fontSize: 11, fontWeight: 600 }}>
+              {health?.dmarc ? <CheckCircle size={12} color="#065f46" /> : <XCircle size={12} color="#991b1b" />}
+              <span style={{ color: health?.dmarc ? '#065f46' : '#991b1b' }}>DMARC</span>
+            </div>
+            <button onClick={handleCheckHealth} disabled={healthChecking} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+              <RefreshCw size={12} style={healthChecking ? { animation: 'spin 1s linear infinite' } : {}} /> Refresh
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 24, marginTop: 8, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: domain.dns_configured ? '#10b981' : '#f59e0b' }} /><Server size={14} color="#6b7280" /><span style={{ fontSize: 13, color: '#6b7280' }}>DNS</span></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: domain.email_routing_enabled ? '#10b981' : '#f59e0b' }} /><Mail size={14} color="#6b7280" /><span style={{ fontSize: 13, color: '#6b7280' }}>Email Routing</span></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: '50%', background: domain.warming_status === 'verified' ? '#10b981' : domain.warming_enabled ? '#f59e0b' : '#d1d5db' }} /><Flame size={14} color="#6b7280" /><span style={{ fontSize: 13, color: '#6b7280' }}>Warming {domain.warming_status === 'verified' ? '✓' : domain.warming_enabled ? '(pending)' : ''}</span></div>

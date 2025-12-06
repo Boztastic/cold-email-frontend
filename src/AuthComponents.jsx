@@ -301,18 +301,20 @@ export function LoginPage() {
           </button>
         </form>
 
-        {/* Default Credentials */}
+        {/* Sign up link */}
         <div style={{
           marginTop: '24px',
-          padding: '16px',
-          background: '#f3f4f6',
-          borderRadius: '8px',
-          fontSize: '13px',
-          color: '#4b5563'
+          textAlign: 'center',
+          fontSize: '14px',
+          color: '#6b7280'
         }}>
-          <p style={{ fontWeight: '600', marginBottom: '8px' }}>Default Credentials:</p>
-          <p style={{ marginBottom: '4px' }}>Email: admin@yourdomain.com</p>
-          <p>Password: ChangeThisPassword123!</p>
+          Don't have an account?{' '}
+          <button 
+            onClick={() => window.location.hash = '#register'}
+            style={{ background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', fontWeight: '500' }}
+          >
+            Sign up
+          </button>
         </div>
       </div>
     </div>
