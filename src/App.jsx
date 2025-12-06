@@ -231,11 +231,11 @@ function DashboardPage() {
 function DomainsPage() {
   const { authFetch } = useAuth();
   const [domains, setDomains] = useState([]);
-  const [newDomain, setNewDomain] = useState('');
-  const [newZoneId, setNewZoneId] = useState('');
+  const [cloudflareDomains, setCloudflareDomains] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(null);
-  const [editingZoneId, setEditingZoneId] = useState({});
+  const [importing, setImporting] = useState(null);
+  const [showImport, setShowImport] = useState(false);
+  const [setupLog, setSetupLog] = useState([]);
 
   useEffect(() => {
     loadDomains();
@@ -251,115 +251,57 @@ function DomainsPage() {
     }
   };
 
-  const addDomain = async (e) => {
-    e.preventDefault();
+  const loadCloudflareDomains = async () => {
     setLoading(true);
+    setShowImport(true);
     try {
-      await authFetch('/api/domains', {
-        method: 'POST',
-        body: JSON.stringify({ domainName: newDomain, cloudflareZoneId: newZoneId })
-      });
-      setNewDomain('');
-      setNewZoneId('');
-      loadDomains();
+      const res = await authFetch('/api/cloudflare/domains');
+      const data = await res.json();
+      if (res.ok) {
+        setCloudflareDomains(data.domains || []);
+      } else {
+        alert(data.error || 'Failed to load Cloudflare domains');
+      }
     } catch (err) {
-      alert('Failed to add domain: ' + err.message);
+      alert('Failed: ' + err.message);
     }
     setLoading(false);
   };
 
-  const updateZoneId = async (domainId) => {
-    const zoneId = editingZoneId[domainId];
-    if (!zoneId) {
-      alert('Enter a Zone ID');
-      return;
-    }
-    setActionLoading(domainId + '-zone');
+  const importDomain = async (zone) => {
+    setImporting(zone.id);
+    setSetupLog([]);
     try {
-      const res = await authFetch(`/api/domains/${domainId}/zone-id`, {
-        method: 'PUT',
-        body: JSON.stringify({ zoneId })
+      const res = await authFetch('/api/domains/import', {
+        method: 'POST',
+        body: JSON.stringify({ zoneId: zone.id, domainName: zone.name })
       });
+      const data = await res.json();
+      
       if (res.ok) {
-        alert('✅ Zone ID saved!');
-        setEditingZoneId({ ...editingZoneId, [domainId]: '' });
+        setSetupLog(data.setupLog || []);
+        setCloudflareDomains(prev => 
+          prev.map(d => d.id === zone.id ? { ...d, imported: true } : d)
+        );
         loadDomains();
       } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to save');
+        alert(data.error || 'Failed to import');
       }
     } catch (err) {
       alert('Failed: ' + err.message);
     }
-    setActionLoading(null);
+    setImporting(null);
   };
 
-  const enableWarming = async (domainId) => {
-    setActionLoading(domainId + '-warming');
+  const refreshDomain = async (domainId) => {
     try {
-      const res = await authFetch(`/api/domains/${domainId}/enable-warming`, { method: 'POST' });
-      const data = await res.json();
+      const res = await authFetch(`/api/domains/${domainId}/refresh`, { method: 'POST' });
       if (res.ok) {
-        alert('Domain added to Resend! Check Resend dashboard for DNS records to add.');
         loadDomains();
-      } else {
-        alert(data.error || 'Failed to enable warming');
       }
     } catch (err) {
-      alert('Failed: ' + err.message);
+      console.error('Refresh failed:', err);
     }
-    setActionLoading(null);
-  };
-
-  const enableInbox = async (domainId) => {
-    setActionLoading(domainId + '-inbox');
-    try {
-      const res = await authFetch(`/api/domains/${domainId}/enable-inbox`, { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        alert('✅ Email inbox enabled! Incoming emails will now be received.');
-        loadDomains();
-      } else {
-        alert(data.error || 'Failed to enable inbox');
-      }
-    } catch (err) {
-      alert('Failed: ' + err.message);
-    }
-    setActionLoading(null);
-  };
-
-  const checkVerification = async (domainId) => {
-    setActionLoading(domainId + '-verify');
-    try {
-      const res = await authFetch(`/api/domains/${domainId}/check-verification`, { method: 'POST' });
-      const data = await res.json();
-      if (data.verified) {
-        alert('✅ Domain verified! Warming is ready.');
-      } else {
-        alert(`Status: ${data.status}. Click "Sync DNS" to auto-add records.`);
-      }
-      loadDomains();
-    } catch (err) {
-      alert('Failed: ' + err.message);
-    }
-    setActionLoading(null);
-  };
-
-  const syncDns = async (domainId) => {
-    setActionLoading(domainId + '-dns');
-    try {
-      const res = await authFetch(`/api/domains/${domainId}/sync-dns`, { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        alert(`✅ ${data.message}`);
-        loadDomains();
-      } else {
-        alert(data.error || 'Failed to sync DNS');
-      }
-    } catch (err) {
-      alert('Failed: ' + err.message);
-    }
-    setActionLoading(null);
   };
 
   const deleteDomain = async (domainId) => {
@@ -376,37 +318,77 @@ function DomainsPage() {
     <div>
       <h2 style={styles.pageTitle}>Domains</h2>
       
+      {/* Import from Cloudflare */}
       <div style={styles.card}>
-        <h3>Add Domain</h3>
-        <form onSubmit={addDomain} style={styles.addDomainForm}>
-          <input
-            type="text"
-            placeholder="example.com"
-            value={newDomain}
-            onChange={(e) => setNewDomain(e.target.value)}
-            style={styles.input}
-            required
-          />
-          <input
-            type="text"
-            placeholder="Cloudflare Zone ID (required for inbox)"
-            value={newZoneId}
-            onChange={(e) => setNewZoneId(e.target.value)}
-            style={styles.input}
-          />
-          <button type="submit" style={styles.primaryButton} disabled={loading}>
-            {loading ? 'Adding...' : 'Add Domain'}
+        <div style={styles.cardHeader}>
+          <h3>☁️ Import from Cloudflare</h3>
+          <button onClick={loadCloudflareDomains} style={styles.primaryButton} disabled={loading}>
+            {loading ? 'Loading...' : showImport ? 'Refresh List' : 'Load My Domains'}
           </button>
-        </form>
-        <p style={styles.helpText}>
-          Find Zone ID in Cloudflare: Domain → Overview → right sidebar
-        </p>
+        </div>
+        
+        {showImport && (
+          <div style={styles.importList}>
+            {cloudflareDomains.length === 0 ? (
+              <p style={styles.emptyText}>
+                {loading ? 'Loading domains from Cloudflare...' : 'No domains found in Cloudflare'}
+              </p>
+            ) : (
+              cloudflareDomains.map(zone => (
+                <div key={zone.id} style={styles.importItem}>
+                  <div style={styles.importInfo}>
+                    <span style={styles.importName}>{zone.name}</span>
+                    <span style={{
+                      ...styles.badge,
+                      backgroundColor: zone.imported ? '#10b981' : '#3b82f6'
+                    }}>
+                      {zone.imported ? '✓ Imported' : 'Available'}
+                    </span>
+                  </div>
+                  {!zone.imported && (
+                    <button 
+                      onClick={() => importDomain(zone)}
+                      style={styles.importButton}
+                      disabled={importing === zone.id}
+                    >
+                      {importing === zone.id ? 'Setting up...' : 'Import & Setup'}
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+        
+        {/* Setup Log */}
+        {setupLog.length > 0 && (
+          <div style={styles.setupLog}>
+            <h4>Setup Progress</h4>
+            {setupLog.map((item, i) => (
+              <div key={i} style={styles.setupLogItem}>
+                <span style={{
+                  ...styles.setupLogIcon,
+                  color: item.status === 'success' ? '#10b981' : 
+                         item.status === 'warning' ? '#f59e0b' : 
+                         item.status === 'error' ? '#ef4444' : '#94a3b8'
+                }}>
+                  {item.status === 'success' ? '✓' : 
+                   item.status === 'warning' ? '⚠' : 
+                   item.status === 'error' ? '✗' : '○'}
+                </span>
+                <span style={styles.setupLogStep}>{item.step}</span>
+                <span style={styles.setupLogMessage}>{item.message}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
+      {/* Imported Domains */}
       <div style={styles.card}>
         <h3>Your Domains</h3>
         {domains.length === 0 ? (
-          <p style={styles.emptyText}>No domains added yet.</p>
+          <p style={styles.emptyText}>No domains imported yet. Click "Load My Domains" above to get started.</p>
         ) : (
           <div style={styles.domainList}>
             {domains.map(domain => (
@@ -420,90 +402,44 @@ function DomainsPage() {
                     {domain.inbox_enabled && (
                       <span style={{...styles.badge, backgroundColor: '#3b82f6'}}>📥 Inbox</span>
                     )}
-                    {!domain.resend_verified && !domain.inbox_enabled && (
-                      <span style={{...styles.badge, backgroundColor: '#6b7280'}}>Not configured</span>
+                    {!domain.resend_verified && (
+                      <span style={{...styles.badge, backgroundColor: '#f59e0b'}}>⏳ Verifying</span>
                     )}
                   </div>
                 </div>
                 
                 <div style={styles.domainStatus}>
                   <div style={styles.statusRow}>
-                    <span style={styles.statusLabel}>Sending (Resend):</span>
+                    <span style={styles.statusLabel}>Sending:</span>
                     <span style={domain.resend_verified ? styles.statusOk : styles.statusPending}>
-                      {domain.resend_verified ? '✓ Verified' : domain.resend_domain_id ? '⏳ Pending DNS' : '○ Not enabled'}
+                      {domain.resend_verified ? '✓ Ready' : '⏳ Pending verification'}
                     </span>
                   </div>
                   <div style={styles.statusRow}>
-                    <span style={styles.statusLabel}>Inbox (Cloudflare):</span>
+                    <span style={styles.statusLabel}>Inbox:</span>
                     <span style={domain.inbox_enabled ? styles.statusOk : styles.statusPending}>
-                      {domain.inbox_enabled ? '✓ Active' : domain.cloudflare_zone_id ? '○ Not enabled' : '⚠️ Need Zone ID'}
+                      {domain.inbox_enabled ? '✓ Active' : '○ Not enabled'}
                     </span>
                   </div>
-                  {domain.cloudflare_zone_id && (
-                    <div style={styles.statusRow}>
-                      <span style={styles.statusLabel}>Zone ID:</span>
-                      <span style={{color: '#64748b', fontSize: '12px'}}>{domain.cloudflare_zone_id.substring(0, 8)}...</span>
-                    </div>
-                  )}
+                  <div style={styles.statusRow}>
+                    <span style={styles.statusLabel}>Accounts:</span>
+                    <span style={{color: '#94a3b8'}}>team@, hello@, contact@, info@</span>
+                  </div>
                 </div>
 
-                {!domain.cloudflare_zone_id && (
-                  <div style={styles.zoneIdInput}>
-                    <input
-                      type="text"
-                      placeholder="Paste Cloudflare Zone ID"
-                      value={editingZoneId[domain.id] || ''}
-                      onChange={(e) => setEditingZoneId({ ...editingZoneId, [domain.id]: e.target.value })}
-                      style={styles.zoneInput}
-                    />
-                    <button 
-                      onClick={() => updateZoneId(domain.id)}
-                      style={styles.zoneButton}
-                      disabled={actionLoading === domain.id + '-zone'}
-                    >
-                      {actionLoading === domain.id + '-zone' ? '...' : 'Save'}
-                    </button>
-                  </div>
-                )}
-
                 <div style={styles.domainActions}>
-                  {!domain.resend_domain_id && (
+                  {!domain.resend_verified && (
                     <button 
-                      onClick={() => enableWarming(domain.id)} 
+                      onClick={() => refreshDomain(domain.id)} 
                       style={styles.actionButton}
-                      disabled={actionLoading === domain.id + '-warming'}
                     >
-                      {actionLoading === domain.id + '-warming' ? '...' : '📤 Enable Sending'}
+                      🔄 Check Status
                     </button>
                   )}
-                  {domain.resend_domain_id && !domain.resend_verified && (
-                    <>
-                      <button 
-                        onClick={() => syncDns(domain.id)} 
-                        style={{...styles.actionButton, backgroundColor: '#f59e0b'}}
-                        disabled={actionLoading === domain.id + '-dns'}
-                      >
-                        {actionLoading === domain.id + '-dns' ? '...' : '🔄 Sync DNS'}
-                      </button>
-                      <button 
-                        onClick={() => checkVerification(domain.id)} 
-                        style={styles.actionButton}
-                        disabled={actionLoading === domain.id + '-verify'}
-                      >
-                        {actionLoading === domain.id + '-verify' ? '...' : '✓ Check Status'}
-                      </button>
-                    </>
-                  )}
-                  {domain.cloudflare_zone_id && !domain.inbox_enabled && (
-                    <button 
-                      onClick={() => enableInbox(domain.id)} 
-                      style={{...styles.actionButton, backgroundColor: '#3b82f6'}}
-                      disabled={actionLoading === domain.id + '-inbox'}
-                    >
-                      {actionLoading === domain.id + '-inbox' ? '...' : '📥 Enable Inbox'}
-                    </button>
-                  )}
-                  <button onClick={() => deleteDomain(domain.id)} style={styles.dangerButton}>
+                  <button 
+                    onClick={() => deleteDomain(domain.id)} 
+                    style={styles.dangerButton}
+                  >
                     Delete
                   </button>
                 </div>
@@ -513,37 +449,18 @@ function DomainsPage() {
         )}
       </div>
 
+      {/* How it works */}
       <div style={styles.card}>
-        <h3>📋 Setup Guide</h3>
-        <div style={styles.setupSteps}>
-          <div style={styles.setupStep}>
-            <span style={styles.stepNumber}>1</span>
-            <div>
-              <strong>Add domain with Cloudflare Zone ID</strong>
-              <p style={styles.stepDesc}>Find Zone ID in Cloudflare dashboard → Your domain → Overview (right sidebar)</p>
-            </div>
-          </div>
-          <div style={styles.setupStep}>
-            <span style={styles.stepNumber}>2</span>
-            <div>
-              <strong>Enable Sending (Resend)</strong>
-              <p style={styles.stepDesc}>Click "Enable Sending" → Add DNS records shown in Resend dashboard</p>
-            </div>
-          </div>
-          <div style={styles.setupStep}>
-            <span style={styles.stepNumber}>3</span>
-            <div>
-              <strong>Enable Inbox (Cloudflare Email Worker)</strong>
-              <p style={styles.stepDesc}>Click "Enable Inbox" → Emails will be received and shown in your Inbox</p>
-            </div>
-          </div>
-          <div style={styles.setupStep}>
-            <span style={styles.stepNumber}>4</span>
-            <div>
-              <strong>Start Warming!</strong>
-              <p style={styles.stepDesc}>Go to Warming page and start building your domain reputation</p>
-            </div>
-          </div>
+        <h3>✨ One-Click Setup</h3>
+        <p style={styles.helpText}>
+          When you import a domain, we automatically:
+        </p>
+        <div style={styles.featureList}>
+          <div style={styles.featureItem}>✓ Create 4 email accounts (team@, hello@, contact@, info@)</div>
+          <div style={styles.featureItem}>✓ Register with Resend for sending</div>
+          <div style={styles.featureItem}>✓ Add DNS records to Cloudflare</div>
+          <div style={styles.featureItem}>✓ Enable email routing</div>
+          <div style={styles.featureItem}>✓ Deploy inbox worker for receiving</div>
         </div>
       </div>
     </div>
@@ -1377,54 +1294,39 @@ const styles = {
   },
   helpText: {
     fontSize: '13px',
-    color: '#64748b',
+    color: '#94a3b8',
     marginTop: '8px'
   },
-  setupSteps: {
+  cardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '16px'
+  },
+  importList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px'
-  },
-  setupStep: {
-    display: 'flex',
-    gap: '16px',
-    alignItems: 'flex-start'
-  },
-  stepNumber: {
-    width: '28px',
-    height: '28px',
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: 'bold',
-    flexShrink: 0
-  },
-  stepDesc: {
-    color: '#94a3b8',
-    fontSize: '13px',
-    marginTop: '4px'
-  },
-  zoneIdInput: {
-    display: 'flex',
     gap: '8px',
-    marginBottom: '16px',
-    padding: '12px',
-    backgroundColor: '#334155',
+    marginTop: '16px'
+  },
+  importItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 16px',
+    backgroundColor: '#0f172a',
     borderRadius: '8px'
   },
-  zoneInput: {
-    flex: 1,
-    padding: '8px 12px',
-    backgroundColor: '#0f172a',
-    border: '1px solid #475569',
-    borderRadius: '6px',
-    color: '#e2e8f0',
-    fontSize: '13px'
+  importInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px'
   },
-  zoneButton: {
+  importName: {
+    fontWeight: '500',
+    fontSize: '15px'
+  },
+  importButton: {
     padding: '8px 16px',
     backgroundColor: '#10b981',
     color: 'white',
@@ -1433,6 +1335,43 @@ const styles = {
     cursor: 'pointer',
     fontSize: '13px',
     fontWeight: '500'
+  },
+  setupLog: {
+    marginTop: '16px',
+    padding: '16px',
+    backgroundColor: '#0f172a',
+    borderRadius: '8px'
+  },
+  setupLogItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '8px 0',
+    borderBottom: '1px solid #1e293b'
+  },
+  setupLogIcon: {
+    fontSize: '16px',
+    width: '20px',
+    textAlign: 'center'
+  },
+  setupLogStep: {
+    fontWeight: '500',
+    minWidth: '120px'
+  },
+  setupLogMessage: {
+    color: '#94a3b8',
+    fontSize: '13px'
+  },
+  featureList: {
+    marginTop: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  },
+  featureItem: {
+    color: '#94a3b8',
+    fontSize: '14px',
+    paddingLeft: '8px'
   },
   domainItem: {
     display: 'flex',
