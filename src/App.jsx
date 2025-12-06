@@ -304,6 +304,21 @@ function DomainsPage() {
     }
   };
 
+  const enableInbox = async (domainId) => {
+    try {
+      const res = await authFetch(`/api/domains/${domainId}/enable-inbox`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        alert('✅ Inbox enabled! Emails will now be received.');
+        loadDomains();
+      } else {
+        alert(data.error || 'Failed to enable inbox');
+      }
+    } catch (err) {
+      alert('Failed: ' + err.message);
+    }
+  };
+
   const deleteDomain = async (domainId) => {
     if (!confirm('Delete this domain?')) return;
     try {
@@ -434,6 +449,14 @@ function DomainsPage() {
                       style={styles.actionButton}
                     >
                       🔄 Check Status
+                    </button>
+                  )}
+                  {domain.zone_id && !domain.inbox_enabled && (
+                    <button 
+                      onClick={() => enableInbox(domain.id)} 
+                      style={{...styles.actionButton, backgroundColor: '#3b82f6'}}
+                    >
+                      📥 Enable Inbox
                     </button>
                   )}
                   <button 
