@@ -235,6 +235,7 @@ function DomainsPage() {
   const [newZoneId, setNewZoneId] = useState('');
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
+  const [editingZoneId, setEditingZoneId] = useState({});
 
   useEffect(() => {
     loadDomains();
@@ -265,6 +266,32 @@ function DomainsPage() {
       alert('Failed to add domain: ' + err.message);
     }
     setLoading(false);
+  };
+
+  const updateZoneId = async (domainId) => {
+    const zoneId = editingZoneId[domainId];
+    if (!zoneId) {
+      alert('Enter a Zone ID');
+      return;
+    }
+    setActionLoading(domainId + '-zone');
+    try {
+      const res = await authFetch(`/api/domains/${domainId}/zone-id`, {
+        method: 'PUT',
+        body: JSON.stringify({ zoneId })
+      });
+      if (res.ok) {
+        alert('✅ Zone ID saved!');
+        setEditingZoneId({ ...editingZoneId, [domainId]: '' });
+        loadDomains();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to save');
+      }
+    } catch (err) {
+      alert('Failed: ' + err.message);
+    }
+    setActionLoading(null);
   };
 
   const enableWarming = async (domainId) => {
@@ -412,7 +439,32 @@ function DomainsPage() {
                       {domain.inbox_enabled ? '✓ Active' : domain.cloudflare_zone_id ? '○ Not enabled' : '⚠️ Need Zone ID'}
                     </span>
                   </div>
+                  {domain.cloudflare_zone_id && (
+                    <div style={styles.statusRow}>
+                      <span style={styles.statusLabel}>Zone ID:</span>
+                      <span style={{color: '#64748b', fontSize: '12px'}}>{domain.cloudflare_zone_id.substring(0, 8)}...</span>
+                    </div>
+                  )}
                 </div>
+
+                {!domain.cloudflare_zone_id && (
+                  <div style={styles.zoneIdInput}>
+                    <input
+                      type="text"
+                      placeholder="Paste Cloudflare Zone ID"
+                      value={editingZoneId[domain.id] || ''}
+                      onChange={(e) => setEditingZoneId({ ...editingZoneId, [domain.id]: e.target.value })}
+                      style={styles.zoneInput}
+                    />
+                    <button 
+                      onClick={() => updateZoneId(domain.id)}
+                      style={styles.zoneButton}
+                      disabled={actionLoading === domain.id + '-zone'}
+                    >
+                      {actionLoading === domain.id + '-zone' ? '...' : 'Save'}
+                    </button>
+                  </div>
+                )}
 
                 <div style={styles.domainActions}>
                   {!domain.resend_domain_id && (
@@ -1354,6 +1406,33 @@ const styles = {
     color: '#94a3b8',
     fontSize: '13px',
     marginTop: '4px'
+  },
+  zoneIdInput: {
+    display: 'flex',
+    gap: '8px',
+    marginBottom: '16px',
+    padding: '12px',
+    backgroundColor: '#334155',
+    borderRadius: '8px'
+  },
+  zoneInput: {
+    flex: 1,
+    padding: '8px 12px',
+    backgroundColor: '#0f172a',
+    border: '1px solid #475569',
+    borderRadius: '6px',
+    color: '#e2e8f0',
+    fontSize: '13px'
+  },
+  zoneButton: {
+    padding: '8px 16px',
+    backgroundColor: '#10b981',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: '500'
   },
   domainItem: {
     display: 'flex',
