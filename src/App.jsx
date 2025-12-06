@@ -534,6 +534,7 @@ function WarmingControlPanel({ getToken, showNotification, domains }) {
 function WarmingPage({ getToken, showNotification }) {
   const [domains, setDomains] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fixingBounces, setFixingBounces] = useState(null);
 
   const fetchDomains = useCallback(async () => {
     try { 
@@ -548,6 +549,19 @@ function WarmingPage({ getToken, showNotification }) {
   }, [getToken]);
 
   useEffect(() => { fetchDomains(); }, [fetchDomains]);
+
+  const handleFixBounces = async (domainId) => {
+    setFixingBounces(domainId);
+    try {
+      const result = await apiCall(`/api/domains/${domainId}/fix-bounces`, { method: 'POST' }, getToken());
+      showNotification(`✅ ${result.message}`, 'success');
+      fetchDomains();
+    } catch (error) {
+      showNotification(`Failed: ${error.message}`, 'error');
+    } finally {
+      setFixingBounces(null);
+    }
+  };
 
   return (
     <div>
@@ -618,6 +632,14 @@ function WarmingPage({ getToken, showNotification }) {
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button 
+                    onClick={() => handleFixBounces(domain.id)} 
+                    disabled={fixingBounces === domain.id}
+                    style={{ ...secondaryButtonStyle, padding: '6px 12px', fontSize: 13 }}
+                  >
+                    {fixingBounces === domain.id ? <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Mail size={14} />}
+                    {fixingBounces === domain.id ? 'Fixing...' : 'Fix Bounces'}
+                  </button>
                   {domain.warming_status === 'verified' && (
                     <span style={{ padding: '6px 12px', background: '#d1fae5', color: '#065f46', borderRadius: 6, fontSize: 13, fontWeight: 500 }}>
                       Ready to warm 🔥
